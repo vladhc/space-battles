@@ -3,7 +3,10 @@ import pickle
 import argparse
 from collections import deque
 
-import numpy as np
+import glob
+import os
+import os.path as path
+
 import tensorflow as tf
 from ray.rllib.agents.ppo.ppo_policy import PPOTFPolicy
 
@@ -19,16 +22,35 @@ logger = logging.getLogger(__name__)
 
 FRAME_STACK = 1
 
-
-def main():
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", dest="checkpoint")
+    parser.add_argument("--checkpointdir", dest="checkpointdir")
     parser.add_argument("--username", dest="username")
     parser.add_argument("--password", dest="password")
     parser.add_argument("--addr", dest="addr")
-    args, _ = parser.parse_known_args()
+    parser.add_argument('--num-games', dest='num_games', default=10)
+    parsed, _ = parser.parse_known_args()
 
-    checkpoint = args.checkpoint
+    if parsed.checkpoint and parsed.checkpointdir:
+        raise(Exception("Can't set both checkpoint and checkpoint dir"))
+
+    return parsed
+
+
+def main(args):
+
+    checkpoint = None
+
+    if args.checkpointdir:
+        path_glob = path.join(args.checkpointdir, '*.cpk')
+        list_of_files = glob.glob(path_glob)
+        latest_file = max(list_of_files, key=os.path.getctime)
+        print('Using checkpoint: ', latest_file)
+        checkpoint = latest_file
+    else:
+        checkpoint = args.checkpoint
+
     weights = pickle.load(open(checkpoint, "rb"))
 
     graph = tf.get_default_graph()
@@ -52,7 +74,7 @@ def main():
         username=args.username,
         password=args.password)
 
-    while True:
+    for _ in range(args.num_games):
         done = False
         game_state = wcl.reset()
 
@@ -70,4 +92,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    PARSED_ARGS = parse_args()
+    while True:
+        main(PARSED_ARGS)
