@@ -96,13 +96,10 @@ def main(args):
         while not done:
             game_state = wcl.game_state()
             done = game_state["game_over"]
-            print(game_state)
             state = adapter.parse_game_state(game_state)
             action, _, _ = policy.compute_single_action(state, [], clip_actions=True)
             action = (action[0][0], action[1][0], action[2][0])
-            print(action)
             cmd = adapter.to_game_action(action)
-            print("sending command:", cmd)
             wcl.action(cmd)
 
 
