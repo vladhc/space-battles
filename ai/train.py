@@ -41,12 +41,15 @@ def train(restore):
         config={
             "env": "SpaceEnv",
             "num_gpus": 1,
-            "num_workers": 16,
+            "num_workers": 18,
+            "num_envs_per_worker": 2,
+            "train_batch_size": 128,
+            "sample_batch_size": 128,
             "num_envs_per_worker": 1,
             "lr": 2e-4,
             "model": {
                 "fcnet_activation": "tanh",
-                "fcnet_hiddens": [1024, 512, 256, 64],
+                "fcnet_hiddens": [512, 256, 64],
             },
             "callbacks": {
                 "on_train_result": _on_train_result,

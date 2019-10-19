@@ -62,7 +62,7 @@ def main(args):
             config={
                 "model": {
                     "fcnet_activation": "tanh",
-                    "fcnet_hiddens": [1024, 512, 256, 64],
+                    "fcnet_hiddens": [512, 256, 64],
                     "max_seq_len": 20,
                 },
             })

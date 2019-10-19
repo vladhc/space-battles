@@ -53,14 +53,14 @@ class RPSAdapter():
 
         ships = source["ships"]
         ships_ratio = action[2]
-        for idx, ratio in enumerate(ships_ratio):
-            ships_ratio[idx] = (ratio + 1) * 0.5
 
         num_a = int(round(ships_ratio[0] * ships[0]))
         num_b = int(round(ships_ratio[1] * ships[1]))
         num_c = int(round(ships_ratio[2] * ships[2]))
         if num_a == 0 and num_b == 0 and num_c == 0:
             return NOOP
+        if num_a < 0 or num_b < 0 or num_c < 0:
+            print("ship ratios and ships:", ships_ratio, ships)
         return 'send {} {} {} {} {}'.format(
             source["id"], target["id"],
             num_a, num_b, num_c)
