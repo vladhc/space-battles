@@ -4,8 +4,12 @@ import argparse
 import ray
 import ray.tune as tune
 
+from env import create_env
+from ray.tune.registry import register_env
+
 
 def run():
+    register_env("SpaceEnv", create_env)
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--restore",
@@ -37,7 +41,7 @@ def train(restore):
         config={
             "env": "SpaceEnv",
             "num_gpus": 1,
-            "num_workers": 14,
+            "num_workers": 1,
             "num_envs_per_worker": 1,
             "lr": 2e-4,
             "callbacks": {

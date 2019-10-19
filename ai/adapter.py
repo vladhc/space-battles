@@ -1,11 +1,39 @@
-import pandas as pd
-import pprint
+import math
+
+import numpy as np
 
 
-tstate = {'planets': [{'id': 0, 'x': 0, 'y': 0, 'owner_id': 0, 'ships': [10, 140, 10], 'production': [0, 13, 0]}, {'id': 1, 'x': -8, 'y': 9, 'owner_id': 1, 'ships': [10, 30, 10], 'production': [0, 2, 0]}, {'id': 2, 'x': 8, 'y': -9, 'owner_id': 2, 'ships': [10, 30, 10], 'production': [0, 2, 0]}, {'id': 3, 'x': 6, 'y': 12, 'owner_id': 0, 'ships': [10, 20, 60], 'production': [0, 1, 5]}, {'id': 4, 'x': -6, 'y': -12, 'owner_id': 0, 'ships': [10, 20, 60], 'production': [0, 1, 5]}, {'id': 5, 'x': 12, 'y': -1, 'owner_id': 0, 'ships': [30, 30, 30], 'production': [2, 2, 2]}, {'id': 6, 'x': -12, 'y': 1, 'owner_id': 0, 'ships': [30, 30, 30], 'production': [2, 2, 2]}, {'id': 7, 'x': 12, 'y': 10, 'owner_id': 0, 'ships': [50, 30, 20], 'production': [4, 2, 1]}, {'id': 8, 'x': -12, 'y': -10, 'owner_id': 0, 'ships': [50, 30, 20], 'production': [4, 2, 1]}, {'id': 9, 'x': -17, 'y': 11, 'owner_id': 0, 'ships': [30, 10, 40], 'production': [2, 0, 3]}, {'id': 10, 'x': 17, 'y': -11, 'owner_id': 0, 'ships': [30, 10, 40], 'production': [2, 0, 3]}, {'id': 11, 'x': 12, 'y': 6, 'owner_id': 0, 'ships': [10, 20, 10], 'production': [0, 1, 0]}, {'id': 12, 'x': -12, 'y': -6, 'owner_id': 0, 'ships': [10, 20, 10], 'production': [0, 1, 0]}, {'id': 13, 'x': 1, 'y': -5, 'owner_id': 0, 'ships': [10, 10, 120], 'production': [0, 0, 11]}, {'id': 14, 'x': -1, 'y': 5, 'owner_id': 0, 'ships': [10, 10, 120], 'production': [0, 0, 11]}, {'id': 15, 'x': -2, 'y': -9, 'owner_id': 0, 'ships': [10, 60, 10], 'production': [0, 5, 0]}, {'id': 16, 'x': 2, 'y': 9, 'owner_id': 0, 'ships': [10, 60, 10], 'production': [0, 5, 0]}, {'id': 17, 'x': -3, 'y': -1, 'owner_id': 0, 'ships': [30, 20, 30], 'production': [2, 1, 2]}, {'id': 18, 'x': 3, 'y': 1, 'owner_id': 0, 'ships': [30, 20, 30], 'production': [2, 1, 2]}, {'id': 19, 'x': 20, 'y': 0, 'owner_id': 0, 'ships': [10, 10, 70], 'production': [0, 0, 6]}, {'id': 20, 'x': -20, 'y': 0, 'owner_id': 0, 'ships': [10, 10, 70], 'production': [0, 0, 6]}], 'fleets': [], 'round': 0, 'max_rounds': 500, 'player_id': 1, 'game_over': False, 'winner': None, 'players': [{'id': 1, 'name': 'test', 'itsme': True}, {'id': 2, 'name': 'random_bot', 'itsme': False}]}
+MAX_PLANETS = 20
+MAX_FLEETS_PER_PLANET = 10
+
+RELATION_FEATURES_PER_PLANET = 2
+# exists, distance
+
+FEATURES_PER_PLANET = 9 + RELATION_FEATURES_PER_PLANET * MAX_PLANETS
+# x, y, owner, ships(x3), production(x3)
+
+FEATURES_PER_FLEET = 5
+# distance, ships(x3), owner
+
+
+class FeatureArray():
+
+    def __init__(self, arr):
+        self.arr = arr
+        self._row = 0
+        self._col = 0
+
+    def push(self, value):
+        self.arr[self._row, self._col] = value
+
+    def finish_row(self):
+        self._row += 1
+        self._col = 0
+
 
 class RPSAdapter():
-    def to_game_action(action):
+
+    def to_game_action(self, action):
         source = action[0]
         target = action[1]
         num_a = action[2]
@@ -16,19 +44,64 @@ class RPSAdapter():
             return 'nop'
         return 'send {} {} {} {} {}'.format(source, target, num_a, num_b, num_c)
 
-    def parse_game_state(state):
-        done = state['game_over']
+    def parse_game_state(self, game_state):
+        my_id = RPSAdapter._my_id(game_state)
 
-        reward = 0
+        state = FeatureArray(np.zeros((MAX_PLANETS, FEATURES_PER_PLANET)))
 
-        planets = state['planets']
-        x = [p['x'] for p in planets]
-        y = [p['x'] for p in planets]
-        num_a, num_b, num_c = [p['ships'] for p in planets]
-        prod_a, prod_b, prod_c = [p['production'] for p in planets]
+        planets = {planet["id"]: planet for planet in game_state["planets"]}
 
-        df = pd.DataFrame(...)
+        for planet_id, planet in planets.items():
+            state.push(planet['x'])
+            state.push(planet['y'])
+            state.push(1 if planet["owner_id"] == my_id else -1)
+            # 3 4 5 -> ships
+            for idx, ship in enumerate(planet["ships"]):
+                state.push(ship)
+            # 6 7 8 -> production
+            for idx, prod in enumerate(planet["production"]):
+                state.push(prod)
 
-        game_state =
+            # 9 ... -> relation to other planets
+            for idx in range(MAX_PLANETS):
+                skip = idx not in planets or idx == planet_id
+                if skip:
+                    state.push(0)  # exists flag
+                    state.push(0)  # distance
+                    continue
+                target_planet = planets[idx]
+                # "exists" flag
+                state.push(1)
+                # distance
+                state.push(RPSAdapter.distance(planet, target_planet))
 
-        return df
+            RPSAdapter._fill_fleets(planet_id, game_state, state)
+
+        return state
+
+    @staticmethod
+    def _fill_fleets(planet_id, game_state, state):
+        my_id = RPSAdapter._my_id(game_state)
+        fleets = [fleet for fleet in game_state["fleets"] if fleet["target"] == planet_id]
+        fleets = sorted(fleets, lambda fleet: fleet["eta"])
+
+        for idx, fleet in enumerate(fleets):
+            if idx > MAX_FLEETS_PER_PLANET:
+                return
+            state.push(1 if fleet["owner_id"] == my_id else -1)
+            for ship in fleet["ship"]:
+                state.push(ship)
+            state.push(fleet["eta"] - game_state["round"])
+
+    @staticmethod
+    def _my_id(state):
+        for player in state["players"]:
+            if player["itsme"]:
+                return player["id"]
+        return None
+
+    @staticmethod
+    def distance(planet, other_planet):  # copy-paste from engine
+        xdiff = planet["x"] - other_planet["x"]
+        ydiff = planet["y"] - other_planet["y"]
+        return int(math.ceil(math.sqrt(xdiff*xdiff + ydiff*ydiff)))

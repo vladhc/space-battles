@@ -1,14 +1,12 @@
 import numpy as np
 
-from ray.tune.registry import register_env
 import gym
 from gym.spaces import Discrete, Box
 
 from game_client import RPSClient
-
-
-FEATURES_PER_PLANET = 10
-MAX_PLANETS = 20
+from adapter import RPSAdapter
+from adapter import FEATURES_PER_PLANET, MAX_PLANETS
+from adapter import FEATURES_PER_FLEET, MAX_FLEETS_PER_PLANET
 
 
 class SpaceEnv(gym.Env):
@@ -16,12 +14,14 @@ class SpaceEnv(gym.Env):
     observation_space = Box(
         low=0,
         high=5,
-        shape=(FEATURES_PER_PLANET * MAX_PLANETS),
+        shape=(
+            FEATURES_PER_PLANET * MAX_PLANETS +
+            FEATURES_PER_FLEET * MAX_FLEETS_PER_PLANET * MAX_PLANETS,),
         dtype=np.int8)
-    action_space = Discrete(len(Command))
+    action_space = Discrete(1)
 
     def __init__(self):
-        self._adapter = Adapter()
+        self._adapter = RPSAdapter()
         self._client = None
 
     def _lazy_init(self):
@@ -44,12 +44,10 @@ class SpaceEnv(gym.Env):
 
     def _fetch(self):
         game_state = self._client.get_state()
-        state, reward, done = self._adapter.parse_game_state(game_state)
-        return state, reward, done
+        state = self._adapter.parse_game_state(game_state)
+        done = game_state["game_over"]
+        return state, 0, done
 
 
 def create_env(env_config):
     return SpaceEnv()
-
-
-register_env("SpaceEnv", create_env)
