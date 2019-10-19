@@ -53,6 +53,9 @@ class RPSAdapter():
 
         ships = source["ships"]
         ships_ratio = action[2]
+        for idx, ratio in enumerate(ships_ratio):
+            ships_ratio[idx] = (ratio + 1) * 0.5
+
         num_a = int(round(ships_ratio[0] * ships[0]))
         num_b = int(round(ships_ratio[1] * ships[1]))
         num_c = int(round(ships_ratio[2] * ships[2]))
@@ -115,6 +118,7 @@ class RPSAdapter():
 
         for idx, fleet in enumerate(fleets):
             if idx > MAX_FLEETS_PER_PLANET:
+                print("max fleets per planet is reached. Total:", len(fleets))
                 return
             state.push(1 if fleet["owner_id"] == player_id else -1)
             for ship in fleet["ships"]:
@@ -132,4 +136,3 @@ def my_id(state):
         if player["itsme"]:
             return player["id"]
     return None
-

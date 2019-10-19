@@ -5,3 +5,5 @@ log/
 .DS_Store
 dumb.rdb
 .data
+node_modules/
+.ipynb_checkpoints/
