@@ -16,7 +16,11 @@ class SpaceEnv(gym.Env):
         high=5,
         shape=(FEATURES_PER_PLANET * MAX_PLANETS,),
         dtype=np.int)
-    action_space = Discrete(1)
+    action_space = Tuple([
+        Discrete(MAX_PLANETS),  # from
+        Discrete(MAX_PLANETS),  # to
+        Box(low=0, high=1, shape=(3,), dtype=np.float32),  # ships(x3)
+    ])
 
     def __init__(self):
         self._adapter = RPSAdapter()
@@ -30,6 +34,7 @@ class SpaceEnv(gym.Env):
     def reset(self):
         self._lazy_init()
 
+        self._adapter.reset()
         self._client.reset()
         state, _, _ = self._fetch()
         return state

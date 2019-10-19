@@ -3,7 +3,7 @@ import math
 import numpy as np
 
 
-MAX_PLANETS = 20
+MAX_PLANETS = 21
 MAX_FLEETS_PER_PLANET = 10
 
 RELATION_FEATURES_PER_PLANET = 2
@@ -16,6 +16,8 @@ FEATURES_PER_FLEET = 5
 FEATURES_PER_PLANET = 9 + RELATION_FEATURES_PER_PLANET * MAX_PLANETS + \
         MAX_FLEETS_PER_PLANET * FEATURES_PER_FLEET
 # x, y, owner, ships(x3), production(x3)
+
+NOOP = "nop"
 
 
 class FeatureArray():
@@ -35,18 +37,33 @@ class FeatureArray():
 
 class RPSAdapter():
 
+    def __init__(self):
+        self._last_game_state = None
+
+    def reset(self):
+        self._last_game_state = None
+
     def to_game_action(self, action):
-        source = action[0]
-        target = action[1]
-        num_a = action[2]
-        num_b = action[3]
-        num_c = action[4]
-        should_pass = action[5]
-        if should_pass > 0.5:
-            return 'nop'
-        return 'send {} {} {} {} {}'.format(source, target, num_a, num_b, num_c)
+        planets = {planet["id"]: planet for planet in self._last_game_state["planets"]}
+        source, target = action[0], action[1]
+        if source not in planets or target not in planets or source == target:
+            return NOOP
+        source = planets[source]
+        target = planets[target]
+
+        ships = source["ships"]
+        ships_ratio = action[2]
+        num_a = round(ships_ratio[0] * ships[0])
+        num_b = round(ships_ratio[1] * ships[1])
+        num_c = round(ships_ratio[2] * ships[2])
+        if num_a == 0 and num_b == 0 and num_c == 0:
+            return NOOP
+        return 'send {} {} {} {} {}'.format(
+            source["id"], target["id"],
+            num_a, num_b, num_c)
 
     def parse_game_state(self, game_state):
+        self._last_game_state = game_state
         my_id = RPSAdapter._my_id(game_state)
 
         state = FeatureArray(
