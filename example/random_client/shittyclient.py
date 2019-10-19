@@ -26,7 +26,6 @@ while 1:
     if not data:
         print("waaait")
         continue
-        break
     elif data[0] == "{":
         state = json.loads(data)
 #        view.update(state)
