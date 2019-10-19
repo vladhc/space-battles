@@ -1,4 +1,5 @@
 import logging
+import random
 import pickle
 import argparse
 from collections import deque
@@ -26,9 +27,11 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", dest="checkpoint")
     parser.add_argument("--checkpointdir", dest="checkpointdir")
+    parser.add_argument("--random", dest="random", action="store_true")
     parser.add_argument("--username", dest="username")
     parser.add_argument("--password", dest="password")
     parser.add_argument("--addr", dest="addr")
+    parser.add_argument("--port", dest="port", default=6000, type=int)
     parser.add_argument('--num-games', dest='num_games', default=5)
     parsed, _ = parser.parse_known_args()
 
@@ -45,9 +48,11 @@ def main(args):
     if args.checkpointdir:
         path_glob = path.join(args.checkpointdir, '*.ckpt')
         list_of_files = glob.glob(path_glob)
-        latest_file = max(list_of_files, key=os.path.getctime)
-        print('Using checkpoint: ', latest_file)
-        checkpoint = latest_file
+        if args.random:
+            checkpoint = random.choice(list_of_files)
+        else:
+            checkpoint = max(list_of_files, key=os.path.getctime)
+        print('Using checkpoint: ', checkpoint)
     else:
         checkpoint = args.checkpoint
 
@@ -70,9 +75,18 @@ def main(args):
 
     adapter = RPSAdapter()
 
+    if args.random:
+        username = os.path.basename(checkpoint)
+        username = os.path.splitext(username)[0]
+        username = username.replace("-", "")
+        print("basename", username)
+    else:
+        username = args.username
+
     wcl = RPSClient(
         addr=args.addr,
-        username=args.username,
+        port=args.port,
+        username=username,
         password=args.password)
 
     for _ in range(args.num_games):
@@ -84,7 +98,7 @@ def main(args):
             done = game_state["game_over"]
             print(game_state)
             state = adapter.parse_game_state(game_state)
-            action, _, _ = policy.compute_single_action(state, [])
+            action, _, _ = policy.compute_single_action(state, [], clip_actions=True)
             action = (action[0][0], action[1][0], action[2][0])
             print(action)
             cmd = adapter.to_game_action(action)

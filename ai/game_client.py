@@ -6,7 +6,7 @@ import socket
 
 class RPSClient():
 
-    def __init__(self, addr=None, username=None, password=None):
+    def __init__(self, addr=None, username=None, password=None, port=None):
         if not username:
             username = randomString()
         if not password:
@@ -16,12 +16,15 @@ class RPSClient():
         if not addr:
             addr = "localhost"
         self.addr = addr
+        if not port:
+            port = 6000
+        self.port = port
         self.io = self.new_socket()
         self.login()
 
     def new_socket(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((self.addr, 6000))
+        s.connect((self.addr, self.port))
         return s.makefile('rw')
 
     def login(self):

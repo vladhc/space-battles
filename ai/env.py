@@ -12,7 +12,7 @@ from adapter import FEATURES_PER_FLEET
 class SpaceEnv(gym.Env):
 
     observation_space = Box(
-        low=-1,
+        low=-np.inf,
         high=np.inf,
         shape=(FEATURES_PER_PLANET * MAX_PLANETS,),
         dtype=np.float32)

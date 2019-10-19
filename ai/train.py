@@ -43,8 +43,8 @@ def train(restore):
             "num_gpus": 1,
             "num_workers": 18,
             "num_envs_per_worker": 2,
-            "train_batch_size": 128,
-            "sample_batch_size": 128,
+            "train_batch_size": 200,
+            "sample_batch_size": 200,
             "num_envs_per_worker": 1,
             "lr": 2e-4,
             "model": {

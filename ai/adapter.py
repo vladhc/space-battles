@@ -4,7 +4,7 @@ import numpy as np
 
 
 MAX_PLANETS = 21
-MAX_FLEETS_PER_PLANET = 10
+MAX_FLEETS_PER_PLANET = 15
 
 RELATION_FEATURES_PER_PLANET = 2
 # exists, distance
@@ -29,6 +29,7 @@ class FeatureArray():
 
     def push(self, value):
         self.arr[self._row, self._col] = value
+        self._col += 1
 
     def finish_row(self):
         self._row += 1
@@ -70,7 +71,7 @@ class RPSAdapter():
         player_id = my_id(game_state)
 
         state = FeatureArray(
-            np.zeros((MAX_PLANETS, FEATURES_PER_PLANET), dtype=np.int))
+            np.zeros((MAX_PLANETS, FEATURES_PER_PLANET), dtype=np.float32))
 
         planets = {planet["id"]: planet for planet in game_state["planets"]}
 
@@ -117,7 +118,7 @@ class RPSAdapter():
         fleets = sorted(fleets, key=lambda fleet: fleet["eta"])
 
         for idx, fleet in enumerate(fleets):
-            if idx > MAX_FLEETS_PER_PLANET:
+            if idx >= MAX_FLEETS_PER_PLANET:
                 print("max fleets per planet is reached. Total:", len(fleets))
                 return
             state.push(1 if fleet["owner_id"] == player_id else -1)

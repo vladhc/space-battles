@@ -16,7 +16,8 @@ import redis
 from engine import Engine
 
 redis_url = os.environ.get('REDIS_URL') or 'localhost'
-redis = redis.Redis(host=redis_url)
+redis_port = os.environ.get('REDIS_PORT') or 6379
+redis = redis.Redis(host=redis_url, port=redis_port)
 pool = eventlet.GreenPool()
 
 COMMAND_DEADLINE = 6
