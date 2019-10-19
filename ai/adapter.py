@@ -9,16 +9,18 @@ MAX_FLEETS_PER_PLANET = 10
 RELATION_FEATURES_PER_PLANET = 2
 # exists, distance
 
-FEATURES_PER_PLANET = 9 + RELATION_FEATURES_PER_PLANET * MAX_PLANETS
-# x, y, owner, ships(x3), production(x3)
 
 FEATURES_PER_FLEET = 5
 # distance, ships(x3), owner
 
+FEATURES_PER_PLANET = 9 + RELATION_FEATURES_PER_PLANET * MAX_PLANETS + \
+        MAX_FLEETS_PER_PLANET * FEATURES_PER_FLEET
+# x, y, owner, ships(x3), production(x3)
+
 
 class FeatureArray():
 
-    def __init__(self, arr):
+    def __init__(self, arr: np.array):
         self.arr = arr
         self._row = 0
         self._col = 0
@@ -47,7 +49,8 @@ class RPSAdapter():
     def parse_game_state(self, game_state):
         my_id = RPSAdapter._my_id(game_state)
 
-        state = FeatureArray(np.zeros((MAX_PLANETS, FEATURES_PER_PLANET)))
+        state = FeatureArray(
+            np.zeros((MAX_PLANETS, FEATURES_PER_PLANET), dtype=np.int))
 
         planets = {planet["id"]: planet for planet in game_state["planets"]}
 
@@ -76,14 +79,15 @@ class RPSAdapter():
                 state.push(RPSAdapter.distance(planet, target_planet))
 
             RPSAdapter._fill_fleets(planet_id, game_state, state)
+            state.finish_row()
 
-        return state
+        return state.arr.flatten()
 
     @staticmethod
     def _fill_fleets(planet_id, game_state, state):
         my_id = RPSAdapter._my_id(game_state)
         fleets = [fleet for fleet in game_state["fleets"] if fleet["target"] == planet_id]
-        fleets = sorted(fleets, lambda fleet: fleet["eta"])
+        fleets = sorted(fleets, key=lambda fleet: fleet["eta"])
 
         for idx, fleet in enumerate(fleets):
             if idx > MAX_FLEETS_PER_PLANET:
