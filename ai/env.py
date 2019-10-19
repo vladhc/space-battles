@@ -43,7 +43,6 @@ class SpaceEnv(gym.Env):
         return state
 
     def step(self, action):
-        action = (0, 0, 0, 0, 0, 1)
         cmd = self._adapter.to_game_action(action)
         self._client.action(cmd)
         state, reward, done = self._fetch()

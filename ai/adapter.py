@@ -53,9 +53,9 @@ class RPSAdapter():
 
         ships = source["ships"]
         ships_ratio = action[2]
-        num_a = round(ships_ratio[0] * ships[0])
-        num_b = round(ships_ratio[1] * ships[1])
-        num_c = round(ships_ratio[2] * ships[2])
+        num_a = int(round(ships_ratio[0] * ships[0]))
+        num_b = int(round(ships_ratio[1] * ships[1]))
+        num_c = int(round(ships_ratio[2] * ships[2]))
         if num_a == 0 and num_b == 0 and num_c == 0:
             return NOOP
         return 'send {} {} {} {} {}'.format(
@@ -95,12 +95,12 @@ class RPSAdapter():
                 if skip:
                     state.push(0)  # exists flag
                     state.push(0)  # distance
-                    continue
-                target_planet = planets[idx]
-                # "exists" flag
-                state.push(1)
-                # distance
-                state.push(RPSAdapter.distance(planet, target_planet))
+                else:
+                    target_planet = planets[idx]
+                    # "exists" flag
+                    state.push(1)
+                    # distance
+                    state.push(RPSAdapter.distance(planet, target_planet))
 
             RPSAdapter._fill_fleets(planet_id, game_state, state)
             state.finish_row()
@@ -117,7 +117,7 @@ class RPSAdapter():
             if idx > MAX_FLEETS_PER_PLANET:
                 return
             state.push(1 if fleet["owner_id"] == player_id else -1)
-            for ship in fleet["ship"]:
+            for ship in fleet["ships"]:
                 state.push(ship)
             state.push(fleet["eta"] - game_state["round"])
 
