@@ -56,6 +56,7 @@ class SpaceEnv(gym.Env):
 
         cur_planets_count = count_planets(game_state)
         reward = cur_planets_count - self._last_planets_count
+        reward -= 0.01  # penalty to make them work faster
         self._last_planets_count = cur_planets_count
 
         return state, reward, done

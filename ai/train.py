@@ -23,9 +23,13 @@ def run():
 
 def train(restore):
 
+    checkpoint_freq = 10
+
     def _on_train_result(info):
         result = info["result"]
         iteration = result["training_iteration"]
+        if iteration % checkpoint_freq != 0:
+            return
 
         trainer = info["trainer"]
         policy = trainer.get_policy()
