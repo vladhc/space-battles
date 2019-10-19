@@ -29,7 +29,7 @@ def parse_args():
     parser.add_argument("--username", dest="username")
     parser.add_argument("--password", dest="password")
     parser.add_argument("--addr", dest="addr")
-    parser.add_argument('--num-games', dest='num_games', default=10)
+    parser.add_argument('--num-games', dest='num_games', default=5)
     parsed, _ = parser.parse_known_args()
 
     if parsed.checkpoint and parsed.checkpointdir:
@@ -43,7 +43,7 @@ def main(args):
     checkpoint = None
 
     if args.checkpointdir:
-        path_glob = path.join(args.checkpointdir, '*.cpk')
+        path_glob = path.join(args.checkpointdir, '*.ckpt')
         list_of_files = glob.glob(path_glob)
         latest_file = max(list_of_files, key=os.path.getctime)
         print('Using checkpoint: ', latest_file)
@@ -53,6 +53,7 @@ def main(args):
 
     weights = pickle.load(open(checkpoint, "rb"))
 
+    tf.reset_default_graph()
     graph = tf.get_default_graph()
     with graph.device("/device:CPU:0"):
         policy = PPOTFPolicy(
