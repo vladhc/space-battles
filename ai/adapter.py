@@ -64,7 +64,7 @@ class RPSAdapter():
 
     def parse_game_state(self, game_state):
         self._last_game_state = game_state
-        my_id = RPSAdapter._my_id(game_state)
+        player_id = my_id(game_state)
 
         state = FeatureArray(
             np.zeros((MAX_PLANETS, FEATURES_PER_PLANET), dtype=np.int))
@@ -74,7 +74,14 @@ class RPSAdapter():
         for planet_id, planet in planets.items():
             state.push(planet['x'])
             state.push(planet['y'])
-            state.push(1 if planet["owner_id"] == my_id else -1)
+
+            owner = 0
+            if planet["owner_id"] == player_id:
+                owner = 1
+            elif planet["owner_id"] != 0:
+                owner = -1
+            state.push(owner)
+
             # 3 4 5 -> ships
             for idx, ship in enumerate(planet["ships"]):
                 state.push(ship)
@@ -102,27 +109,27 @@ class RPSAdapter():
 
     @staticmethod
     def _fill_fleets(planet_id, game_state, state):
-        my_id = RPSAdapter._my_id(game_state)
+        player_id = my_id(game_state)
         fleets = [fleet for fleet in game_state["fleets"] if fleet["target"] == planet_id]
         fleets = sorted(fleets, key=lambda fleet: fleet["eta"])
 
         for idx, fleet in enumerate(fleets):
             if idx > MAX_FLEETS_PER_PLANET:
                 return
-            state.push(1 if fleet["owner_id"] == my_id else -1)
+            state.push(1 if fleet["owner_id"] == player_id else -1)
             for ship in fleet["ship"]:
                 state.push(ship)
             state.push(fleet["eta"] - game_state["round"])
-
-    @staticmethod
-    def _my_id(state):
-        for player in state["players"]:
-            if player["itsme"]:
-                return player["id"]
-        return None
 
     @staticmethod
     def distance(planet, other_planet):  # copy-paste from engine
         xdiff = planet["x"] - other_planet["x"]
         ydiff = planet["y"] - other_planet["y"]
         return int(math.ceil(math.sqrt(xdiff*xdiff + ydiff*ydiff)))
+
+def my_id(state):
+    for player in state["players"]:
+        if player["itsme"]:
+            return player["id"]
+    return None
+

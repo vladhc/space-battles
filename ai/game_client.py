@@ -25,7 +25,6 @@ class RPSClient():
         self.action('login {} {}'.format(self.username, self.password))
 
     def reset(self):
-        print("reset", self.username)
         self.io.close()
         self.io = self.new_socket()
         self.login()

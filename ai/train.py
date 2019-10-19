@@ -41,7 +41,7 @@ def train(restore):
         config={
             "env": "SpaceEnv",
             "num_gpus": 1,
-            "num_workers": 2,
+            "num_workers": 16,
             "num_envs_per_worker": 1,
             "lr": 2e-4,
             "callbacks": {
