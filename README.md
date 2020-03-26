@@ -1,17 +1,19 @@
 Rocket Paper Spacegoo
 ======================
+
+Teaser Images
+-------------
+![leaderboard](images/Leaderboard.png)
+![graph](images/Graph.png)
+![canvas](images/Canvas.png)
+
+
 Disclaimer
 ---------
 All credit for this game goes to the original creators (https://bitbucket.org/dividuum/rocket-scissor-spacegoo).
 This is mainly a fork of said repo which makes the game
-easier runable on a modern machine (updated dependencies, vagrant, english language, minor fixes). Also a new shiny ui ^_^
+easier runable on a modern machine (updated dependencies, docker-compose, python3, english language, minor fixes, more game logic). Also a new shiny ui ^_^
 
-Assets
-------
-
-vector.py - https://raw.github.com/nickretallack/bunnies/master/vector.py
-
----------
 
 What its about: 2 players play either a maximum number of rounds or until
 one player is eliminated (has no planets and no ships left). Every player
@@ -99,8 +101,14 @@ An example gamestate looks as follows:
           "y": 0,
           "x": 0,
           "ships": [ 20, 20, 20 ],  // current amount of ships of type a,b,c
-          "production": [ 1, 1, 1 ] // production of ships in each round/tick of type a, b, c
+          "production": [ 1, 1, 1 ], // production of ships in each round/tick of type a, b, c,
+          "production_rounds_left": 100 // number of rounds where this planet will still be producing ships
         },
+        ...
+      ],
+      "hyperlanes": [ // contains edges along which travel is allowed
+        [0, 1],       // e.g. you can send ships from the first to the second planet 
+        [1, 0],
         ...
       ],
     }
@@ -162,8 +170,8 @@ def battle(s1,s2):
 
 Kind-of-explanatory images:
 ----------------
-![principle](Spacegoo_01_principle.png)
-![battle system](Spacegoo_02_battle_system.png)
+![principle](images/Spacegoo_01_principle.png)
+![battle system](images/Spacegoo_02_battle_system.png)
 
 Client-Libraries
 ----------------
@@ -172,3 +180,9 @@ Haskell developers should check out
 [haskell-spacegoo](https://bitbucket.org/nomeata/haskell-spacegoo)
 to easily programm clients
 
+Bots
+----------------
+- https://github.com/vladhc/space-battles
+- https://github.com/Alexandre-Silva/hackerton-freiheit
+- https://github.com/flodiebold/vitalis-hackerthon 
+- https://github.com/mrwonko/fdc-hackerthon-2019

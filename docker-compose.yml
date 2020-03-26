@@ -3,16 +3,15 @@ version: '2'
 services:
   server:
     build: .
-    restart: always
     ports:
       - '8080:8080'
       - '6000:6000'
     environment:
       - REDIS_URL=redis
+      - ALLOW_ACCOUNT_CREATION=true
     depends_on:
       - redis
     volumes:
-      - .data/log:/opt/server/log
       - ./app:/opt/server/repo_app
     networks:
       default:
@@ -20,28 +19,13 @@ services:
 
   redis:
     image: 'bitnami/redis:5.0'
-    restart: always
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
       - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
     ports:
       - '6379:6379'
-    volumes:
-      - .data/redis:/bitnami/redis/data
     networks:
       internal:
-
-  caddy:
-    image: "wemakeservices/caddy-docker:latest"
-    volumes:
-      - ./caddy/certs:/root/.caddy
-      - ./caddy/Caddyfile:/etc/Caddyfile
-    ports:
-      - "2015:2015"
-      - "80:80"
-      - "443:443"
-    depends_on:
-      - server
 
 volumes:
   redis_data:

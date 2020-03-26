@@ -2,8 +2,7 @@ import sys
 import os
 import gzip
 import logging
-import simplejson as json
-from itertools import izip_longest, izip
+from itertools import zip_longest
 
 from flask import Flask, Response
 from flask import render_template, jsonify, send_from_directory
@@ -15,23 +14,27 @@ INACTIVE_COUNT = 100
 
 redis_url = os.environ.get('REDIS_URL') or 'localhost'
 redis = redis.Redis(host=redis_url)
+redis.ping()
 
 app = Flask(__name__, static_folder="app/build/static", template_folder="app/build")
 CORS(app)
 
+
 def grouper(iterable, n, fillvalue=None):
     args = [iter(iterable)] * n
-    return izip_longest(fillvalue=fillvalue, *args)
+    return zip_longest(fillvalue=fillvalue, *args)
 
 
 def make_game_list(game_ids):
     p = redis.pipeline()
     for game_id in game_ids:
+        game_id = game_id.decode()
         p.hget('game:%s' % game_id, 'p1')
         p.hget('game:%s' % game_id, 'p2')
         p.hget('game:%s' % game_id, 'elodiff')
+        p.hget('game:%s' % game_id, 'end')
     games = []
-    for game_id, (player1, player2, elodiff) in izip(game_ids, grouper(p.execute(), 3)):
+    for game_id, (player1, player2, elodiff, end) in zip(game_ids, grouper(p.execute(), 4)):
         if elodiff:
             elodiff = float(elodiff)
             if elodiff < 0:
@@ -43,6 +46,7 @@ def make_game_list(game_ids):
             player2 = player2,
             elodiff = elodiff,
             game_id = game_id,
+            end     = end,
         ))
     return games
 
@@ -69,7 +73,7 @@ def get_run_info(username = None):
         p = redis.pipeline()
         p.lindex('player:%s:games' % score_user, -1)
         (last_game,) = p.execute()
-        inactive = (int(last_game_ids[-1]) - int(last_game) > INACTIVE_COUNT)
+        inactive = (int(last_game_ids[-1] or 0) - int(last_game or 0) > INACTIVE_COUNT)
         highscores.append([score_user, -score, inactive] )
 
     last_games = make_game_list(list(reversed(last_game_ids)))
@@ -115,7 +119,7 @@ def player_info(username):
 
 class vec(list):
     def add_inplace(self, other):
-        for idx, (a, b) in enumerate(izip(self, other)):
+        for idx, (a, b) in enumerate(zip(self, other)):
             self[idx] = a + b
 
 @app.route("/api/game/<int:game_id>/info.json")
@@ -157,11 +161,11 @@ def game_rounds(game_id, fromround):
     game_log_name = "log/%08d/%04d.json" % (game_id / 1000, game_id % 1000)
     game_log = None
     try:
-        game_log = file(game_log_name, "rb")
+        game_log = open(game_log_name, "rb")
     except IOError:
         game_log_name = game_log_name + ".gz"
         game_log = gzip.GzipFile(game_log_name, "rb")
-    lines = game_log.readlines()
+    lines = [l.decode() for l in game_log.readlines()]
     return Response (
             response = "[" + ",".join(lines[fromround:]) + "]",
             status = 200,
@@ -172,11 +176,11 @@ def game_rounds(game_id, fromround):
 def logs(log_path):
     game_log_name = "log/" + log_path
     try:
-        game_log = file(game_log_name, "rb")
+        game_log = open(game_log_name, "rb")
     except IOError:
         game_log_name = game_log_name + ".gz"
         game_log = gzip.GzipFile(game_log_name, "rb")
-    lines = game_log.readlines()
+    lines = [l.decode() for l in game_log.readlines()]
     return Response (
             response = "[" + ",".join(lines) + "]",
             status = 200,

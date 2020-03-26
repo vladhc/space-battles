@@ -2,6 +2,7 @@ import React, {useEffect, useRef, memo} from 'react';
 
 let stars_buffer;
 let planets_buffer;
+let hyperlanes_buffer;
 let last_gameId;
 
 const default_shades = ["#BFBBB8", "#E4E0DC", "#807D7A", ];
@@ -19,6 +20,7 @@ export const GameCanvas = memo(({turn, info, gameId}) => {
         if (gameId !== last_gameId) {
            stars_buffer = null;
            planets_buffer = null;
+           hyperlanes_buffer = null;
            last_gameId = gameId;
         }
 
@@ -95,6 +97,43 @@ export const GameCanvas = memo(({turn, info, gameId}) => {
             }
         }
 
+        if (!hyperlanes_buffer && turn && turn.hyperlanes) {
+            hyperlanes_buffer = document.createElement('canvas');
+            hyperlanes_buffer.width = width;
+            hyperlanes_buffer.height = height;
+            const hc = hyperlanes_buffer.getContext("2d");
+            hc.translate(width/2, height/2);
+
+            const planets = turn.planets;
+
+            // remove duplicates
+            const hyperlaneSet = new Set();
+            const hyperlanes = turn.hyperlanes.filter(v => {
+                const id1 = v[0] + "_" + v[1];
+                const id2 = v[1] + "_" + v[0];
+                if (hyperlaneSet.has(id1) || hyperlaneSet.has(id2))  {
+                    return false;
+                }
+                hyperlaneSet.add(id1);
+                hyperlaneSet.add(id2);
+                return true;
+            });
+
+            for (let idx = 0; idx < hyperlanes.length; idx++) {
+                const [start_idx, end_idx] = hyperlanes[idx];
+
+                const pl1 = planets[start_idx];
+                const pl2 = planets[end_idx];
+
+                hc.save();
+                hc.moveTo(pl1.x * -size_scale, pl1.y * size_scale);
+                hc.lineTo(pl2.x * -size_scale, pl2.y * size_scale);
+                hc.setLineDash([5, 20]);
+                hc.strokeStyle = "lightgrey";
+                hc.stroke();
+                hc.restore();
+            }
+        }
 
         const render = () => {
             const c = canvas.getContext("2d");
@@ -104,6 +143,7 @@ export const GameCanvas = memo(({turn, info, gameId}) => {
             if (!turn || !turn.planets) return;
 
             c.drawImage(stars_buffer, -canvas.width/2, -canvas.height/2);
+            c.drawImage(hyperlanes_buffer, -canvas.width/2, -canvas.height/2);
 
             const planets = turn.planets;
             for (let idx = 0; idx < planets.length; idx++) {
@@ -144,14 +184,15 @@ export const GameCanvas = memo(({turn, info, gameId}) => {
             c.drawImage(planets_buffer, -canvas.width/2, -canvas.height/2);
 
             // semi-transparent planet owner overlay
-            c.globalAlpha = 0.4;
             for (let idx = 0; idx < planets.length; idx++) {
                 const planet = planets[idx];
                 if (planet.owner_id !== 0) {
                     const total_production = planet.production[0] + planet.production[1] + planet.production[2];
                     const planet_r = Math.sqrt(total_production / (max_production*2)) * planet_canvas_size;
                     c.beginPath();
-                    c.fillStyle = ["invalid", "green", "red"][planet.owner_id];
+
+                    c.globalAlpha = 0.4;
+                    c.fillStyle = ["lightgrey", "green", "red"][planet.owner_id];
                     c.moveTo(
                         planet.x * -size_scale,
                         planet.y * size_scale
@@ -161,6 +202,14 @@ export const GameCanvas = memo(({turn, info, gameId}) => {
                         planet.y * size_scale,
                         planet_r, 0, 2 * Math.PI, false);
                     c.fill();
+
+                    c.globalAlpha = 1;
+                    c.fillStyle = "#111111";
+                    c.font = "bold 20px rps-font";
+                    c.textAlign = "center";
+                    c.textBaseline = "ideographic";
+                    c.fillText(planet.production_rounds_left, planet.x * -size_scale, planet.y * size_scale + 10);
+
                 }
             }
             c.globalAlpha = 1;

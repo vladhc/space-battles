@@ -1,9 +1,12 @@
 *.pyc
 env/
-log/
 .vagrant
 .DS_Store
 dumb.rdb
 .data
 node_modules/
 .ipynb_checkpoints/
+log
+app/public
+caddy/certs/
+.data/redis/appendonly.aof

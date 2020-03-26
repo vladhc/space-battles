@@ -1,6 +1,5 @@
 import re
 import os
-import gzip
 import time
 import errno
 import eventlet
@@ -8,7 +7,7 @@ import simplejson as json
 import random
 import subprocess
 from collections import OrderedDict
-from math import*
+from math import *
 
 from eventlet.green import socket
 import redis
@@ -30,12 +29,13 @@ redis.ping()
 class Authenticator(object):
     def check(self, username, password):
         saved_password = redis.get("user:%s" % username)
-        if not saved_password:
-            if len(username) > 20:
+        if not saved_password and os.environ.get('ALLOW_ACCOUNT_CREATION') == 'true':
+            if len(username) > 100:
                 return False
             redis.set("user:%s" % username, password)
             return True
-        return saved_password == password
+
+        return saved_password and saved_password.decode() == password
 
 Authenticator = Authenticator()
 
@@ -86,7 +86,7 @@ class Player(object):
             self.conn.disconnect()
 
     def disqualify(self, reason):
-        print "player %r disqualified: %s" % (self, reason)
+        print("player %r disqualified: %s" % (self, reason))
         other_player = self.game.other_player(self)
         self.game.game_end(
             other_player.player_id,
@@ -113,10 +113,22 @@ class Player(object):
         if self.cmd_issued:
             self.disqualify("sent more than one command")
             return
+        if a < 0 or b < 0 or c < 0:
+            self.disqualify("sent negative amount of ships")
+            return
+        if [origin_id, target_id] not in self.game.engine.hyperlanes:
+            self.disqualify("travel outside of hyperlanes is not alowed!")
+            return
         self.cmd_issued = True
         self.send("command received. waiting for other player...")
-        self.game.engine.send_fleet(self.player_id, origin_id, target_id, [max(0,a),max(0,b),max(0,c)])
+        self.game.engine.send_fleet(self.player_id, origin_id, target_id, [a,b,c])
         self.game.check_round_finished()
+
+    def __eq__(self, other):
+        return self.username == other.username
+
+    def __hash__(self):
+        return hash(self.username)
 
     def __repr__(self):
         return "<Player %s>" % (self.username)
@@ -126,15 +138,15 @@ class Game(object):
         assert len(players) == 2
         self.game_id = redis.incr('game_id')
 
-        print "starting game %r" % self.game_id
+        print("starting game %r" % self.game_id)
 
         self.game_log_name = "log/%08d/%04d.json" % (self.game_id / 1000, self.game_id % 1000)
         try:
             os.makedirs(os.path.dirname(self.game_log_name))
-        except OSError, err:
+        except OSError as err:
             if err.errno != errno.EEXIST:
                 raise
-        self.game_log = file(self.game_log_name, "wb")
+        self.game_log = open(self.game_log_name, "wb")
 
         self.players = players
 
@@ -172,7 +184,7 @@ class Game(object):
     def game_end(self, winner, reason):
         assert not self.game_over
 
-        print "game ends: winner is %s: %s" % (winner, reason)
+        print("game ends: winner is %s: %s" % (winner, reason))
 
         if self.deadline is not None:
             self.deadline.cancel()
@@ -204,7 +216,8 @@ class Game(object):
         self.send_state()
 
         for player in self.players:
-            player.send("This game is now available at http://rps.vhenne.de/game/%d" % self.game_id)
+            player.send("This game is now available at http://rps.freiheit.systems/game/%d" % self.game_id)
+            MatchMaking.remove_player(player)
 
         self.game_log.close()
 
@@ -226,7 +239,6 @@ class Game(object):
 
 
     def check_round_finished(self):
-        # pruefen, ob beide spieler befehle abgegeben haben...
         for player in self.players:
             if not player.cmd_issued:
                 return
@@ -300,46 +312,55 @@ class Game(object):
     def send_state(self):
         for player in self.players:
             player.send(json.dumps(self.get_player_state(player)))
-        self.game_log.write(json.dumps(self.get_log_state()))
-        self.game_log.write("\n")
+        self.game_log.write(json.dumps(self.get_log_state()).encode())
+        self.game_log.write("\n".encode())
         self.game_log.flush()
 
 class MatchMaking(object):
     def __init__(self):
         self.lobby = []
+        self.loggedIn = set()
+
+    def has_player(self, player):
+        return player in self.loggedIn
 
     def add_player(self, player):
         self.lobby.append(player)
+        self.loggedIn.add(player)
+
 
     def remove_player(self, player):
         if player in self.lobby:
             self.lobby.remove(player)
 
+        if player in self.loggedIn:
+          self.loggedIn.remove(player)
+
     def check_should_game_start(self):
         pairing = []
         for player in self.lobby:
             pairing.append((player.get_score(), player))
-        pairing.sort()
+        pairing = sorted(pairing, key=lambda t: t[0])
 
         while len(pairing) >= 2:
             first_idx = random.randint(0, len(pairing)-1)
             while 1:
                 second_idx = int(random.gauss(first_idx, 2))
                 second_idx = max(0, min(len(pairing) - 1, second_idx))
-                if second_idx != first_idx:
+                if second_idx != first_idx and pairing[first_idx][1].username != pairing[second_idx][1].username:
                     break
             if first_idx > second_idx:
                 first_idx, second_idx = second_idx, first_idx
             (elo1, player1), (elo2, player2) = pairing.pop(second_idx), pairing.pop(first_idx)
-            print "sending %s (%f) and %s (%f) into game" % (
-                player1, elo1, player2, elo2)
+            print("sending %s (%f) and %s (%f) into game" % (
+                player1, elo1, player2, elo2))
             Game([player1, player2])
 
-        # uebriggebliebenen Spieler ist nun die neue Lobby
         self.lobby = [player for _, player in pairing]
 
     def dump(self):
-        print "%d player in lobby" % len(self.lobby)
+        print(f"{len(self.lobby)} player in lobby, {self.lobby}")
+        print(f"logged in players {self.loggedIn}")
 
 MatchMaking = MatchMaking()
 
@@ -355,13 +376,23 @@ class Connection(object):
     def handle_cmd_login(self, username, password):
         if self.player:
             self.send("already logged in")
+            self.disconnect()
             return
 
         if not Authenticator.check(username, password):
             self.send("invalid login")
+            self.disconnect()
             return
 
-        self.player = Player(self, username)
+        player = Player(self, username)
+
+        if MatchMaking.has_player(player):
+            self.send("you are already logged in")
+            self.disconnect()
+            return
+
+        self.player = player
+
         self.send("your current score: %.2f. waiting for game start..." % self.player.get_score())
         MatchMaking.add_player(self.player)
 
@@ -407,7 +438,7 @@ class Connection(object):
         self.send("closing connection. see you next time")
         self.write_queue.put(None) # signal eof to writer
 
-        print "reader closed"
+        print("reader closed")
         self.read_file.close()
         self.reader_thread.kill()
         # no code here: the kill might prevent this from being reached
@@ -421,11 +452,35 @@ class Connection(object):
         if not line: # eof
             return None
 
-        if not re.match("^[a-z 0-9A-Z_\-]*$", line):
-            self.send("Invalid data received. Valid bytes: [a-z 0-9A-Z_\-]")
-            return None
+        tokens = []
+        in_quote = False
+        while line:
+            if not in_quote:
+                next_match = re.search(r'\s*["\s]', line)
+                if next_match:
+                    token = line[:next_match.start()]
+                    if next_match[0].endswith('"'):
+                        in_quote = True
+                    line = line[next_match.end():]
+                else:
+                    token = line
+                    line = ""
 
-        return [token.strip().lower() for token in line.split() if token]
+                if not re.match("^[a-z 0-9A-Z_\-]*$", token):
+                    self.send("Invalid data received. Valid bytes: [a-z 0-9A-Z_\-]")
+                    return None
+                tokens.append(token.strip().lower())
+            else:
+                quote_end = re.search(r'"\s*', line)
+                if not quote_end:
+                    self.send("Unfinished quote")
+                    return None
+                quoted_token = line[:quote_end.start()]
+                line = line[quote_end.end():]
+                tokens.append(quoted_token)
+                in_quote = False
+
+        return tokens
 
     def reader(self):
         while 1:
@@ -442,7 +497,7 @@ class Connection(object):
             else:
                 try:
                     handler(*args)
-                except TypeError, err:
+                except TypeError as err:
                     self.send("invalid arguments: %s" % err)
 
     def writer(self):
@@ -451,11 +506,11 @@ class Connection(object):
             if data is None: # should close write side
                 break
             try:
-                self.socket.send(data)
+                self.socket.send(data.encode())
             except socket.error:
                 break
 
-        print "writer closed"
+        print("writer closed")
         try:
             self.socket.shutdown(socket.SHUT_WR)
         except socket.error:

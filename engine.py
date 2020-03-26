@@ -1,14 +1,18 @@
 from collections import OrderedDict
+from scipy.spatial import Delaunay
 from math import *
 import random
+
+MAX_PRODUCTION_ROUNDS = 100
 
 
 class Planet():
     def __init__(self,id,owner_id,production,posx,posy):
         self.id = id
         self.owner_id = owner_id
+        self.production_rounds = 0
         self.production = production
-        self.ships = map(lambda s: s*10 + 10, production)
+        self.ships = [s*10 + 10 for s in production]
         self.posx = posx
         self.posy = posy
 
@@ -24,7 +28,8 @@ class Planet():
             ("y", self.posy),
             ("owner_id", self.owner_id),
             ("ships", self.ships),
-            ("production", self.production)
+            ("production", self.production),
+            ("production_rounds_left", max(MAX_PRODUCTION_ROUNDS - self.production_rounds, 0))
         ])
         return state
 
@@ -55,11 +60,9 @@ def battle(s1,s2):
         new1 = battle_round(ships2,ships1)
         ships2 = battle_round(ships1,ships2)
         ships1 = new1
-        #print ships1,ships2
 
-    ships1 = map(int,ships1)
-    ships2 = map(int,ships2)
-    #print ships1,ships2
+    ships1 = list(map(int,ships1))
+    ships2 = list(map(int,ships2))
     return ships1, ships2
 
 
@@ -68,27 +71,27 @@ class Fleet():
         self.eta = current_round + origin.distance(target)
         self.origin = origin
         self.target = target
-        self.ships = map(lambda want, onplanet: min(max(want,0),onplanet), ships,origin.ships)
-        origin.ships = map(lambda infleet,onplanet: onplanet-infleet, self.ships,origin.ships)
+        self.ships = list(map(lambda want, onplanet: min(max(want,0),onplanet), ships,origin.ships))
+        origin.ships = list(map(lambda infleet,onplanet: onplanet-infleet, self.ships,origin.ships))
         self.id = id
         self.owner_id = owner_id
+        self.alive = True
 
     def land(self):
         # print "fleet landing"
         if self.target.owner_id == self.owner_id:
-            self.target.ships = map(lambda infleet,onplanet: infleet+onplanet, self.ships,self.target.ships)
+            self.target.ships = list(map(lambda infleet,onplanet: infleet+onplanet, self.ships,self.target.ships))
         else:
             #battle!
             attacker,defender = battle(self.ships,self.target.ships)
             if sum(defender) > 0:
                 #defended!
-                # print "ZOMG defended"
                 self.target.ships = defender
             else:
                 #invasion successful!
-                # print "ZOMG invasion successful"
                 self.target.ships = attacker
                 self.target.owner_id = self.owner_id
+
     def dump(self):
         state = OrderedDict([
              ("id", self.id),
@@ -97,12 +100,25 @@ class Fleet():
              ("origin", self.origin.id),
              ("target", self.target.id),
              ("eta", self.eta),
+             ("alive", self.alive)
         ])
         return state
 
     def combine(self, other):
         for idx, count in enumerate(other.ships):
             self.ships[idx] += count
+
+    def battle(self, other):
+        self_ships, other_ships = battle(self.ships,other.ships)
+        self.ships = self_ships
+        other.ships = other_ships
+
+        if sum(other_ships) > 0:
+            # we died
+            self.alive = False
+        else:
+            other.alive = False
+
 
 class Engine():
 
@@ -131,7 +147,6 @@ class Engine():
             else:
                 production = [max(1,int(abs(random.gauss(0,3))))]*3
         random.shuffle(production)
-        print production
         return production
 
 
@@ -142,7 +157,7 @@ class Engine():
             ydiff = y-planet.posy
             dist = sqrt(xdiff*xdiff + ydiff*ydiff)
             mindist = min(mindist,dist)
-        return (mindist > 3.0)
+        return (mindist > 5.0)
 
     def find_fitting_position(self,max_x, max_y):
         x = 0
@@ -162,10 +177,17 @@ class Engine():
             x,y = self.find_fitting_position(max_x, max_y)
             self.insert_symmetric_planets(x,y,self.generate_planet(), start_planets=((i==0) or (i < num_planets/2) and (random.randint(0,10) < 2)))
 
-        #print self.planets
+        points = [[planet.posx, planet.posy] for planet in self.planets]
+        for tri in Delaunay(points).simplices:
+            for i in range(3):
+                pt1 = tri[i]
+                pt2 = tri[(i+1)%3]
+                self.hyperlanes.append([int(pt1), int(pt2)])
+                self.hyperlanes.append([int(pt2), int(pt1)])
 
     def __init__(self,max_rounds = 500):
         self.planets = []
+        self.hyperlanes = []
         self.generate_map()
         self.fleets = []
         self.round = 0
@@ -178,6 +200,11 @@ class Engine():
             return
         if not (0 <= target_id < len(self.planets)):
             return
+        if origin_id == target_id:
+            return
+        if sum(ships) == 0:
+            return
+
         origin = self.planets[origin_id]
         target = self.planets[target_id]
 
@@ -185,25 +212,27 @@ class Engine():
         if not player_id == origin.owner_id:
             return
 
-        self.fleets.append(Fleet(self.next_fleet_id, player_id, origin, target,ships,self.round))
+        new_fleet = Fleet(self.next_fleet_id, player_id, origin, target,ships,self.round)
+        if sum(new_fleet.ships) == 0:
+            return
+
+        self.fleets.append(new_fleet)
         self.next_fleet_id+=1
 
 
     def do_round(self):
-        # print "DINGDINGDING ROUND ", self.round
-
         for i,planet in enumerate(self.planets):
             # print "planet ", i, "owner ", planet.owner_id, " :"
-            if not planet.owner_id == 0:
-                planet.ships = map(lambda s,p: s+p, planet.ships, planet.production)
+            if not planet.owner_id == 0 and planet.production_rounds is not MAX_PRODUCTION_ROUNDS:
+                planet.production_rounds += 1
+                planet.ships = list(map(lambda s,p: s+p, planet.ships, planet.production))
             # print planet.ships
 
         players_alive = []
         land_on_planet = {}
-        highest_owner = 1
         for fleet in self.fleets[:]:
             player = fleet.owner_id
-            # print "fleet ", fleet.id, ", owner ", fleet.owner_id, ", eta ", fleet.eta
+            # print("fleet ", fleet.id, ", owner ", fleet.owner_id, ", eta ", fleet.eta)
             if not player in players_alive:
                 players_alive.append(player)
             if fleet.eta == self.round:
@@ -212,19 +241,46 @@ class Engine():
                 if fleet.target not in land_on_planet:
                     land_on_planet[fleet.target] = []
                 land_on_planet[fleet.target].append(fleet)
-                if fleet.owner_id > highest_owner: highest_owner = fleet.owner_id
 
-        for planet, fleets in land_on_planet.iteritems():
-            # print "landing fleets on ", planet
-            fleets_of_players = [[] for _ in range(highest_owner + 1)]
+        for planet, fleets in land_on_planet.items():
+            # print("landing fleets on ", planet)
+            fleets_of_players = {}
             for fleet in fleets:
+                if fleet.owner_id not in fleets_of_players:
+                    fleets_of_players[fleet.owner_id] = []
                 fleets_of_players[fleet.owner_id].append(fleet)
-            for playerfleets in fleets_of_players:
+
+            # combine the fleets
+            for key, playerfleets in fleets_of_players.items():
                 if len(playerfleets) > 1:
                     for other in playerfleets[1:]:
                         playerfleets[0].combine(other)
-                if playerfleets:
-                    playerfleets[0].land()
+
+
+            survivor = None
+            # check if there are multiple players landing the same time. If so, let them battle first
+            keys = list(fleets_of_players.keys())
+            if len(keys) > 1:
+                # print("more than one player!", fleets_of_players)
+                if len(keys) > 2:
+                    print("ERROR! more than 2 different playes landed on the planet")
+
+                p1 = fleets_of_players[keys[0]][0]
+                p2 = fleets_of_players[keys[1]][0]
+
+                p1.battle(p2)
+
+                if p1.alive:
+                    survivor = p1
+                elif p2.alive:
+                    survivor = p2
+
+            else:
+                survivor = fleets_of_players[keys[0]][0]
+
+
+            if survivor:
+                survivor.land()
 
         for planet in self.planets:
             player = planet.owner_id
@@ -246,10 +302,11 @@ class Engine():
 
     def dump(self):
         state = OrderedDict([
-            ("planets", map(lambda p: p.dump(), self.planets)),
-            ("fleets", map(lambda f: f.dump(), self.fleets)),
+            ("planets", [p.dump() for p in self.planets]),
+            ("fleets", [f.dump() for f in self.fleets]),
             ("round", self.round),
             ("max_rounds", self.max_rounds),
+            ("hyperlanes", self.hyperlanes)
         ])
         return state
 
@@ -257,5 +314,5 @@ class Engine():
 if __name__ == "__main__":
     engine = Engine()
     engine.do_round()
-    print engine.dump()
+    print(engine.dump())
 
