@@ -4,7 +4,7 @@ from typing import Mapping, Any
 from models import State, Planet, Hyperlane, Fleet
 
 
-def json2state(tick: Mapping[str, Any]) -> State:
+def json2state(state: Mapping[str, Any]) -> State:
     """Converts game state json to state model"""
     planets = {
         props['id']: Planet(
@@ -14,7 +14,7 @@ def json2state(tick: Mapping[str, Any]) -> State:
             ships=props['ships'],
             production=props['production'],
             production_rounds_left=props['production_rounds_left'])
-        for props in tick['planets']
+        for props in state['planets']
     }
     fleets = [
         Fleet(
@@ -23,19 +23,19 @@ def json2state(tick: Mapping[str, Any]) -> State:
                 props['ships'][1],
                 props['ships'][2]),
             eta=props['eta'],
-            owner=props['owner'],
+            owner=props['owner'] if 'owner' in props else -1,
             origin=props['origin'],
             target=props['target'])
-        for props in tick['fleets']
+        for props in state['fleets']
     ]
     hyperlanes = {
         Hyperlane(
             origin=props[0],
             target=props[1],
-            fleets={
+            fleets=(
                 fleet for fleet in fleets
                 if fleet.origin == props[0] and fleet.target == props[1]
-            })
-        for props in tick['hyperlane']
+            ))
+        for props in state['hyperlanes']
     }
     return State(planets=planets, hyperlanes=hyperlanes)
