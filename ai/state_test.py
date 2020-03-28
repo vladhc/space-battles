@@ -3,9 +3,13 @@
 import unittest
 
 import numpy as np
+import graph_nets as gn
+import sonnet as snt
 import tensorflow as tf
 
 from state import create_state_inputs, map_inputs_to_states
+from state import state_inputs2graphs_tuple
+from state import FLEET_FEATURE_COUNT
 from models import State, Hyperlane, Planet, Fleet
 
 
@@ -42,6 +46,23 @@ class TestState(unittest.TestCase):
                 origin=0,
                 target=1),
         }
+
+    def test_states_with_empty_fleets(self):
+        hyperlanes = {
+            (0, 1): Hyperlane(
+                origin=1,
+                target=0),
+            (1, 0): Hyperlane(
+                origin=0,
+                target=1),
+        }
+        state = State(
+            hyperlanes=hyperlanes,
+            planets=self.planets)
+
+        mapped = map_inputs_to_states([state])[0]
+
+        self.assertEqual(mapped['fleets_0'].shape, (0, FLEET_FEATURE_COUNT))
 
     def test_state_inputs(self):
         planets = self.planets
@@ -124,3 +145,33 @@ class TestState(unittest.TestCase):
                 "unexpected hyperlane_sources " +
                 "and hyperlane_targets:\n{} {}".format(
                     src, tgt))
+
+    def test_encode_states(self):
+        state = State(
+            hyperlanes=self.hyperlanes,
+            planets=self.planets)
+        batch = [state, state, state]
+        inputs = create_state_inputs(batch_size=len(batch))
+
+        graphs_tuple_tf = state_inputs2graphs_tuple(inputs)
+
+        units = [32, 16, 8]
+        graph_network = gn.modules.GraphNetwork(
+            edge_model_fn=lambda: snt.nets.MLP(
+                units, activate_final=True),
+            node_model_fn=lambda: snt.nets.MLP(
+                units, activate_final=True),
+            global_model_fn=lambda: snt.nets.MLP(
+                units, activate_final=False),
+            name='game_state_encoder')
+        out_graph = graph_network(graphs_tuple_tf)
+        encoded = out_graph.globals
+
+        model = tf.keras.Model(inputs=inputs, outputs=encoded)
+
+        output = model.predict_on_batch(
+            map_inputs_to_states(batch))
+
+        self.assertEqual(
+            output.shape,
+            (len(batch), units[-1]))

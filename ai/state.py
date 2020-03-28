@@ -1,9 +1,10 @@
 """Utilities for encoding/decoding game state"""
-from typing import Mapping, List
+from typing import Mapping, List, Dict
 
-import numpy as np
+import graph_nets as gn
 import tensorflow as tf
 from tensorflow.keras import Input
+import numpy as np
 
 from models import State, Planet
 
@@ -12,21 +13,39 @@ PLANET_FEATURE_COUNT = 10
 
 FLEET_FEATURE_COUNT = 5  # Without origin and target
 
+NODES = "nodes"
+EDGES = "edges"
+RECEIVERS = "receivers"
+SENDERS = "senders"
+GLOBALS = "globals"
 
-def map_inputs_to_states(states: List[State]) -> Mapping[Input, np.array]:
+FLEETS = "fleets"
+FLEETS_COUNT = "fleets_count"
+PLANETS = "planets"
+PLANETS_COUNT = "planets_count"
+HYPERLANE_TARGETS = "hyperlane_targets"
+HYPERLANE_SOURCES = "hyperlane_sources"
+HYPERLANE_COUNT = "hyperlanes_count"
+
+
+def map_inputs_to_states(
+        states: List[State]) -> List[Dict[str, np.array]]:
     """
     Creates mapping from models to batch of game states.
     """
 
-    mapping = {}
+    arr = []
 
     for idx, state in enumerate(states):
-        mapping['planets_count_{}'.format(idx)] = np.asarray([
+        mapping: Dict[str, np.array] = {}
+        arr.append(mapping)
+
+        mapping['{}_{}'.format(PLANETS_COUNT, idx)] = np.asarray([
             len(state.planets)], dtype=np.int32)
-        mapping['hyperlanes_count_{}'.format(idx)] = np.asarray([
+        mapping['{}_{}'.format(HYPERLANE_COUNT, idx)] = np.asarray([
             len(state.hyperlanes)], dtype=np.int32)
 
-        mapping['planets_{}'.format(idx)] = _encode_planets(state.planets)
+        mapping['{}_{}'.format(PLANETS, idx)] = _encode_planets(state.planets)
 
         fleets = []
         sources = np.zeros(
@@ -47,20 +66,59 @@ def map_inputs_to_states(states: List[State]) -> Mapping[Input, np.array]:
                 ])
             hyperlane_idx += 1
 
-        mapping['hyperlane_sources_{}'.format(idx)] = sources
-        mapping['hyperlane_targets_{}'.format(idx)] = targets
+        mapping['{}_{}'.format(HYPERLANE_SOURCES, idx)] = sources
+        mapping['{}_{}'.format(HYPERLANE_TARGETS, idx)] = targets
 
-        mapping['fleets_{}'.format(idx)] = np.asarray(fleets)
-        mapping['fleets_count_{}'.format(idx)] = np.asarray([
+        if fleets:
+            fleets = np.asarray(fleets, dtype=np.float32)
+        else:
+            fleets = np.zeros(shape=(0, FLEET_FEATURE_COUNT), dtype=np.float32)
+        mapping['{}_{}'.format(FLEETS, idx)] = fleets
+        mapping['{}_{}'.format(FLEETS_COUNT, idx)] = np.asarray([
             len(fleets)])
 
-    return mapping
+    return arr
+
+
+def state_inputs2graphs_tuple(
+        state_inputs: List[Mapping[str, Input]]) -> gn.graphs.GraphsTuple:
+    """
+    Transforms model inputs from create_state_inputs() into
+    GraphsTuple objects, which can be used for encoding the game state.
+    """
+    data_dicts = []
+
+    for state in state_inputs:
+        lanes_count = state[HYPERLANE_COUNT]
+        lanes_count = tf.reshape(lanes_count, ())
+
+        planets_count = state[PLANETS_COUNT]
+        planets_count = tf.reshape(planets_count, ())
+        planets = tf.reshape(
+            state[PLANETS],
+            shape=(planets_count, PLANET_FEATURE_COUNT))
+
+        data_dicts.append({
+            GLOBALS: tf.random.uniform(
+                shape=(4,)),
+            NODES: planets,
+            EDGES: tf.random.uniform(
+                shape=(lanes_count, 4)),
+            SENDERS: tf.reshape(
+                state[HYPERLANE_SOURCES],
+                shape=(lanes_count,)),
+            RECEIVERS: tf.reshape(
+                state[HYPERLANE_TARGETS],
+                shape=(lanes_count,)),
+        })
+
+    return gn.utils_tf.data_dicts_to_graphs_tuple(data_dicts)
 
 
 def _encode_planets(planets: Mapping[int, Planet]) -> np.array:
     encoded = np.zeros(
         shape=(len(planets), PLANET_FEATURE_COUNT),
-        dtype=np.int32)
+        dtype=np.float32)
     for planet_id, planet in planets.items():
         encoded[planet_id] = [
             planet.owner,
@@ -89,32 +147,32 @@ def create_state_inputs(batch_size: int) -> List[Mapping[str, Input]]:
 
 def _create_state_input(suffix: str) -> Mapping[str, Input]:
     return {
-        'planets_count': Input(
+        PLANETS_COUNT: Input(
             shape=(),
-            name='planets_count_{}'.format(suffix),
+            name='{}_{}'.format(PLANETS_COUNT, suffix),
             dtype=tf.dtypes.int32),
-        'hyperlanes_count': Input(
+        HYPERLANE_COUNT: Input(
             shape=(),
-            name='hyperlanes_count_{}'.format(suffix),
+            name='{}_{}'.format(HYPERLANE_COUNT, suffix),
             dtype=tf.dtypes.int32),
-        'hyperlane_sources': Input(
+        HYPERLANE_SOURCES: Input(
             shape=(),
-            name='hyperlanes_sources_{}'.format(suffix),
+            name='{}_{}'.format(HYPERLANE_SOURCES, suffix),
             dtype=tf.dtypes.int32),
-        'hyperlane_targets': Input(
+        HYPERLANE_TARGETS: Input(
             shape=(),
-            name='hyperlanes_targets_{}'.format(suffix),
+            name='{}_{}'.format(HYPERLANE_TARGETS, suffix),
             dtype=tf.dtypes.int32),
-        'fleets_count': Input(
+        FLEETS_COUNT: Input(
             shape=(),
-            name='fleets_count_{}'.format(suffix),
+            name='{}_{}'.format(FLEETS_COUNT, suffix),
             dtype=tf.dtypes.int32),
-        'planets': Input(
+        PLANETS: Input(
             shape=(PLANET_FEATURE_COUNT,),
-            name='planets_{}'.format(suffix),
+            name='{}_{}'.format(PLANETS, suffix),
             dtype=tf.dtypes.float32),
-        'fleets': Input(
+        FLEETS: Input(
             shape=(FLEET_FEATURE_COUNT,),
-            name='fleets_{}'.format(suffix),
+            name='{}_{}'.format(FLEETS, suffix),
             dtype=tf.dtypes.float32),
     }
