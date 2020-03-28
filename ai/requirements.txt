@@ -1,0 +1,6 @@
+jupyterlab>=2.0.1
+jupyter-http-over-ws>=0.0.8
+tensorflow-gpu>=2.1.0-rc1
+graph-nets>=1.1.0
+dm-sonnet>=2.0.0b0
+tensorflow-probability>=0.9.0
