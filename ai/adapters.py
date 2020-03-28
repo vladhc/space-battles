@@ -35,7 +35,7 @@ def json2state(state: Mapping[str, Any]) -> State:
         for props in state['fleets']
     ]
     hyperlanes = {
-        Hyperlane(
+        (props[0], props[1]): Hyperlane(
             origin=props[0],
             target=props[1],
             fleets=tuple([
@@ -45,3 +45,30 @@ def json2state(state: Mapping[str, Any]) -> State:
         for props in state['hyperlanes']
     }
     return State(planets=planets, hyperlanes=hyperlanes)
+
+
+def attach_action(state: State, action: str) -> State:
+    """
+    Finds an edge in the state, corresponding to the action
+    and attaches action's parameter to it. Action
+    is an actual string which is sent to the server. For example:
+    sent 1 4 8 1 1
+    """
+    action = action.strip()
+    if not action:
+        return state
+    params = action.split(' ')
+    if params[0] != 'sent':
+        return state
+
+    origin = int(params[1])
+    target = int(params[2])
+    coord = (origin, target)
+
+    state.hyperlanes[coord] = state.hyperlanes[coord]._replace(
+        action=(
+            int(params[3]),
+            int(params[4]),
+            int(params[5])))
+
+    return state
