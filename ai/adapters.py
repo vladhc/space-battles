@@ -23,7 +23,7 @@ def json2state(state: Mapping[str, Any]) -> State:
                 props['ships'][1],
                 props['ships'][2]),
             eta=props['eta'],
-            owner=props['owner'] if 'owner' in props else -1,
+            owner=props['owner_id'],
             origin=props['origin'],
             target=props['target'])
         for props in state['fleets']
@@ -32,7 +32,7 @@ def json2state(state: Mapping[str, Any]) -> State:
         Hyperlane(
             origin=props[0],
             target=props[1],
-            fleets=(
+            fleets=tuple(
                 fleet for fleet in fleets
                 if fleet.origin == props[0] and fleet.target == props[1]
             ))

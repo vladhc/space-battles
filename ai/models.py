@@ -25,7 +25,7 @@ class Hyperlane(NamedTuple):
     """Hyperlane connecting two planets"""
     origin: int
     target: int
-    fleets: Tuple[Fleet]
+    fleets: Tuple[Fleet, ...]
     action: Tuple[int, int, int] = (0, 0, 0)
 
 
