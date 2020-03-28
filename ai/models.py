@@ -1,31 +1,35 @@
 """Models representing game state"""
-from typing import NamedTuple, List, Tuple
+from typing import NamedTuple, Set, Tuple, Mapping
 
 
 class Fleet(NamedTuple):
     """Fleet of ships"""
     ships: Tuple[int, int, int]
+    origin: int
+    target: int
     eta: int
     owner: int
 
 
 class Planet(NamedTuple):
     """Planet"""
-    id: int
     x: int
     y: int
     owner: int
+    ships: Tuple[int, int, int]
+    production: Tuple[int, int, int]
+    production_rounds_left: int
 
 
 class Hyperlane(NamedTuple):
     """Hyperlane connecting two planets"""
-    sender: int
-    receiver: int
+    origin: int
+    target: int
+    fleets: Set[Fleet]
     action: Tuple[int, int, int] = (0, 0, 0)
-    fleets: List[Fleet] = []
 
 
 class State(NamedTuple):
     """Complete snapshot of the game state"""
-    planets: List[Planet] = []
-    hyperlanes: List[Hyperlane] = []
+    planets: Mapping[int, Planet]
+    hyperlanes: Set[Hyperlane]
