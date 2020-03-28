@@ -9,10 +9,10 @@ from state import create_state_inputs, map_inputs_to_states
 from models import State, Hyperlane, Planet, Fleet
 
 
-class TestStateInputs(unittest.TestCase):
+class TestState(unittest.TestCase):
 
-    def test_feed(self):
-        planets = {
+    def setUp(self):
+        self.planets = {
             1: Planet(
                 owner=1,
                 x=2,
@@ -25,6 +25,26 @@ class TestStateInputs(unittest.TestCase):
                 x=4,
                 y=6,
                 ships=(4, 5, 6))}
+        self.fleets = [
+            Fleet(  # The only and the one
+                owner=2,
+                origin=1,
+                target=0,
+                ships=(3, 2, 1),
+                eta=5),
+        ]
+        self.hyperlanes = {
+            (0, 1): Hyperlane(
+                origin=1,
+                target=0,
+                fleets=(self.fleets[0],)),
+            (1, 0): Hyperlane(
+                origin=0,
+                target=1),
+        }
+
+    def test_state_inputs(self):
+        planets = self.planets
         planets_encoded = np.asarray([
             [
                 planets[0].owner,
@@ -51,14 +71,7 @@ class TestStateInputs(unittest.TestCase):
             ],
         ], dtype=np.float32)
 
-        fleets = [
-            Fleet(  # The only and the one
-                owner=2,
-                origin=1,
-                target=0,
-                ships=(3, 2, 1),
-                eta=5),
-        ]
+        fleets = self.fleets
         fleets_encoded = np.asarray([
             [
                 fleets[0].owner,
@@ -69,17 +82,7 @@ class TestStateInputs(unittest.TestCase):
             ]
         ], dtype=np.int32)
 
-        hyperlanes = {
-            (0, 1): Hyperlane(
-                origin=1,
-                target=0,
-                fleets=(fleets[0],)),
-            (1, 0): Hyperlane(
-                origin=0,
-                target=1),
-        }
-        hyperlane_sources = np.asarray([0, 1], dtype=np.int32)
-        hyperlane_targets = np.asarray([1, 0], dtype=np.int32)
+        hyperlanes = self.hyperlanes
 
         state = State(
             hyperlanes=hyperlanes,
@@ -108,9 +111,16 @@ class TestStateInputs(unittest.TestCase):
         np.testing.assert_almost_equal(
             record['fleets'],
             fleets_encoded)
-        np.testing.assert_equal(
-            record['hyperlane_sources'],
-            hyperlane_sources)
-        np.testing.assert_equal(
-            record['hyperlane_targets'],
-            hyperlane_targets)
+
+        # Hyperlanes order is not defined
+        src = record['hyperlane_sources']
+        tgt = record['hyperlane_targets']
+        lanes_match = np.array_equal(
+            src, [0, 1]) and np.array_equal(tgt, [1, 0])
+        lanes_match = lanes_match or (np.array_equal(
+            src, [1, 0]) and np.array_equal(tgt, [0, 1]))
+        if not lanes_match:
+            self.fail(
+                "unexpected hyperlane_sources " +
+                "and hyperlane_targets:\n{} {}".format(
+                    src, tgt))
