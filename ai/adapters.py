@@ -1,5 +1,5 @@
 """Functions for converting from game json to model classes"""
-from typing import Mapping, Any
+from typing import Mapping, Any, Dict, Tuple
 
 from models import State, Planet, Hyperlane, Fleet
 
@@ -65,10 +65,15 @@ def attach_action(state: State, action: str) -> State:
     target = int(params[2])
     coord = (origin, target)
 
-    state.hyperlanes[coord] = state.hyperlanes[coord]._replace(
+    hyperlanes: Dict[Tuple[int, int], Hyperlane] = {}
+    hyperlanes.update(state.hyperlanes)
+    hyperlane = state.hyperlanes[coord]
+
+    del hyperlanes[coord]
+    hyperlanes[coord] = hyperlane._replace(
         action=(
             int(params[3]),
             int(params[4]),
             int(params[5])))
 
-    return state
+    return state._replace(hyperlanes=hyperlanes)

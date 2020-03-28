@@ -1,5 +1,5 @@
 """Models representing game state"""
-from typing import NamedTuple, Tuple, Mapping, Dict
+from typing import NamedTuple, Tuple, Mapping
 
 
 class Fleet(NamedTuple):
@@ -32,4 +32,4 @@ class Hyperlane(NamedTuple):
 class State(NamedTuple):
     """Complete snapshot of the game state"""
     planets: Mapping[int, Planet]
-    hyperlanes: Dict[Tuple[int, int], Hyperlane]
+    hyperlanes: Mapping[Tuple[int, int], Hyperlane]
