@@ -11,8 +11,14 @@ def json2state(state: Mapping[str, Any]) -> State:
             x=props['x'],
             y=props['y'],
             owner=props['owner_id'],
-            ships=props['ships'],
-            production=props['production'],
+            ships=(
+                int(props['ships'][0]),
+                int(props['ships'][1]),
+                int(props['ships'][2])),
+            production=(
+                int(props['production'][0]),
+                int(props['production'][1]),
+                int(props['production'][2])),
             production_rounds_left=props['production_rounds_left'])
         for props in state['planets']
     }
@@ -32,10 +38,10 @@ def json2state(state: Mapping[str, Any]) -> State:
         Hyperlane(
             origin=props[0],
             target=props[1],
-            fleets=tuple(
+            fleets=tuple([
                 fleet for fleet in fleets
                 if fleet.origin == props[0] and fleet.target == props[1]
-            ))
+            ]))
         for props in state['hyperlanes']
     }
     return State(planets=planets, hyperlanes=hyperlanes)
