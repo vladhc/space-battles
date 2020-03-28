@@ -58,7 +58,7 @@ def attach_action(state: State, action: str) -> State:
     if not action:
         return state
     params = action.split(' ')
-    if params[0] != 'sent':
+    if params[0] != 'send':
         return state
 
     origin = int(params[1])
