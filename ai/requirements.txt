@@ -1,5 +1,6 @@
 jupyterlab>=2.0.1
 jupyter-http-over-ws>=0.0.8
+matplotlib>=3.2.1
 tensorflow-gpu>=2.1.0-rc1
 graph-nets>=1.1.0
 dm-sonnet>=2.0.0b0
