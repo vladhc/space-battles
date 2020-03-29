@@ -7,7 +7,7 @@ import graph_nets as gn
 import sonnet as snt
 import tensorflow as tf
 
-from state import create_state_inputs, map_inputs_to_states
+from state import create_state_inputs, feed_dict
 from state import state_inputs2graphs_tuple
 from state import FLEET_FEATURE_COUNT
 from models import State, Hyperlane, Planet, Fleet
@@ -38,11 +38,11 @@ class TestState(unittest.TestCase):
                 eta=5),
         ]
         self.hyperlanes = {
-            (0, 1): Hyperlane(
+            (1, 0): Hyperlane(
                 origin=1,
                 target=0,
                 fleets=(self.fleets[0],)),
-            (1, 0): Hyperlane(
+            (0, 1): Hyperlane(
                 origin=0,
                 target=1),
         }
@@ -60,7 +60,7 @@ class TestState(unittest.TestCase):
             hyperlanes=hyperlanes,
             planets=self.planets)
 
-        mapped = map_inputs_to_states([state])[0]
+        mapped = feed_dict([state])[0]
 
         self.assertEqual(mapped['fleets_0'].shape, (0, FLEET_FEATURE_COUNT))
 
@@ -113,7 +113,7 @@ class TestState(unittest.TestCase):
         model = tf.keras.Model(inputs=inputs, outputs=inputs)
 
         output = model.predict_on_batch(
-            map_inputs_to_states([state]))
+            feed_dict([state]))
 
         self.assertEqual(len(output), 1)
         record = output[0]
@@ -136,15 +136,21 @@ class TestState(unittest.TestCase):
         # Hyperlanes order is not defined
         src = record['hyperlane_sources']
         tgt = record['hyperlane_targets']
+        fleet_count = record['hyperlane_fleet_count']
         lanes_match = np.array_equal(
-            src, [0, 1]) and np.array_equal(tgt, [1, 0])
+            src, [0, 1]) and np.array_equal(
+                tgt, [1, 0] and np.array_equal(
+                    fleet_count, [0, 1]))
         lanes_match = lanes_match or (np.array_equal(
-            src, [1, 0]) and np.array_equal(tgt, [0, 1]))
+            src, [1, 0]) and np.array_equal(
+                tgt, [0, 1]) and np.array_equal(
+                    fleet_count, [1, 0]))
         if not lanes_match:
             self.fail(
-                "unexpected hyperlane_sources " +
-                "and hyperlane_targets:\n{} {}".format(
-                    src, tgt))
+                "unexpected hyperlane_sources, " +
+                "hyperlane_targets and " +
+                "hyperlane_fleet_count:\n{} {} {}".format(
+                    src, tgt, fleet_count))
 
     def test_encode_states(self):
         state = State(
@@ -170,7 +176,7 @@ class TestState(unittest.TestCase):
         model = tf.keras.Model(inputs=inputs, outputs=encoded)
 
         output = model.predict_on_batch(
-            map_inputs_to_states(batch))
+            feed_dict(batch))
 
         self.assertEqual(
             output.shape,

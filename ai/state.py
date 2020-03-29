@@ -25,10 +25,11 @@ PLANETS = "planets"
 PLANETS_COUNT = "planets_count"
 HYPERLANE_TARGETS = "hyperlane_targets"
 HYPERLANE_SOURCES = "hyperlane_sources"
+HYPERLANE_FLEET_COUNT = "hyperlane_fleet_count"
 HYPERLANE_COUNT = "hyperlanes_count"
 
 
-def map_inputs_to_states(
+def feed_dict(
         states: List[State]) -> List[Dict[str, np.array]]:
     """
     Creates mapping from models to batch of game states.
@@ -52,10 +53,12 @@ def map_inputs_to_states(
             shape=(len(state.hyperlanes)),
             dtype=np.int32)
         targets = np.zeros_like(sources)
+        hyperlane_fleet_count = np.zeros_like(sources, dtype=np.int32)
         hyperlane_idx = 0
         for from_to, hyperlane in state.hyperlanes.items():
             sources[hyperlane_idx] = from_to[0]
             targets[hyperlane_idx] = from_to[1]
+            hyperlane_fleet_count[hyperlane_idx] = len(hyperlane.fleets)
             for fleet in hyperlane.fleets:
                 fleets.append([
                     fleet.owner,
@@ -68,6 +71,8 @@ def map_inputs_to_states(
 
         mapping['{}_{}'.format(HYPERLANE_SOURCES, idx)] = sources
         mapping['{}_{}'.format(HYPERLANE_TARGETS, idx)] = targets
+        mapping['{}_{}'.format(
+            HYPERLANE_FLEET_COUNT, idx)] = hyperlane_fleet_count
 
         if fleets:
             fleets = np.asarray(fleets, dtype=np.float32)
@@ -175,4 +180,8 @@ def _create_state_input(suffix: str) -> Mapping[str, Input]:
             shape=(FLEET_FEATURE_COUNT,),
             name='{}_{}'.format(FLEETS, suffix),
             dtype=tf.dtypes.float32),
+        HYPERLANE_FLEET_COUNT: Input(
+            shape=(),
+            name='{}_{}'.format(HYPERLANE_FLEET_COUNT, suffix),
+            dtype=tf.dtypes.int32),
     }
