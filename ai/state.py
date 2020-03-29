@@ -12,6 +12,7 @@ from models import State, Planet
 PLANET_FEATURE_COUNT = 10
 
 FLEET_FEATURE_COUNT = 5  # Without origin and target
+HYPERLANE_EMBEDDING_SIZE = 32
 
 NODES = "nodes"
 EDGES = "edges"
@@ -25,7 +26,7 @@ PLANETS = "planets"
 PLANETS_COUNT = "planets_count"
 HYPERLANE_TARGETS = "hyperlane_targets"
 HYPERLANE_SOURCES = "hyperlane_sources"
-HYPERLANE_FLEET_COUNT = "hyperlane_fleet_count"
+HYPERLANE_FLEET_COUNT = "hyperlane_fleet_count"  # fleets count per hyperlane
 HYPERLANE_COUNT = "hyperlanes_count"
 
 
@@ -93,10 +94,36 @@ def state_inputs2graphs_tuple(
     """
     data_dicts = []
 
+    to_ragged = tf.keras.layers.Lambda(
+        lambda args: tf.RaggedTensor.from_row_lengths(
+            values=args[0], row_lengths=args[1]).to_tensor(),
+        name='to_ragged')
+    mask_zeros = tf.keras.layers.Masking(name='mask_zeros')
+    lane_embedder = tf.keras.layers.TimeDistributed(
+        layer=tf.keras.layers.Dense(
+            units=HYPERLANE_EMBEDDING_SIZE,
+            name='fleet_embedder'),
+        name='lane_embedder')
+
     for state in state_inputs:
+        # Edges
         lanes_count = state[HYPERLANE_COUNT]
         lanes_count = tf.reshape(lanes_count, ())
 
+        # Create edge embeddings from fleets
+        lanes = to_ragged([
+            state[FLEETS],
+            state[HYPERLANE_FLEET_COUNT],
+        ])
+        lanes = mask_zeros(lanes)
+        lanes = lane_embedder(lanes)
+        lanes = tf.keras.backend.mean(lanes, axis=1)
+        lanes = tf.reshape(
+            lanes,
+            shape=(lanes_count, HYPERLANE_EMBEDDING_SIZE),
+            name='reshape_lanes')
+
+        # Nodes
         planets_count = state[PLANETS_COUNT]
         planets_count = tf.reshape(planets_count, ())
         planets = tf.reshape(
@@ -107,8 +134,7 @@ def state_inputs2graphs_tuple(
             GLOBALS: tf.random.uniform(
                 shape=(4,)),
             NODES: planets,
-            EDGES: tf.random.uniform(
-                shape=(lanes_count, 4)),
+            EDGES: lanes,
             SENDERS: tf.reshape(
                 state[HYPERLANE_SOURCES],
                 shape=(lanes_count,)),
