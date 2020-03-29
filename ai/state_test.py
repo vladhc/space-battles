@@ -181,3 +181,5 @@ class TestState(unittest.TestCase):
         self.assertEqual(
             output.shape,
             (len(batch), units[-1]))
+        np.testing.assert_almost_equal(output[0], output[1])
+        np.testing.assert_almost_equal(output[0], output[2])

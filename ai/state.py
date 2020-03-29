@@ -131,8 +131,7 @@ def state_inputs2graphs_tuple(
             shape=(planets_count, PLANET_FEATURE_COUNT))
 
         data_dicts.append({
-            GLOBALS: tf.random.uniform(
-                shape=(4,)),
+            GLOBALS: tf.zeros(shape=(1,)),
             NODES: planets,
             EDGES: lanes,
             SENDERS: tf.reshape(
