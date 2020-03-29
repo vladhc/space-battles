@@ -10,6 +10,7 @@ import tensorflow as tf
 from state import create_state_inputs, feed_dict
 from state import state_inputs2graphs_tuple
 from state import FLEET_FEATURE_COUNT
+from state import HYPERLANE_EMBEDDING_SIZE
 from models import State, Hyperlane, Planet, Fleet
 
 
@@ -183,3 +184,27 @@ class TestState(unittest.TestCase):
             (len(batch), units[-1]))
         np.testing.assert_almost_equal(output[0], output[1])
         np.testing.assert_almost_equal(output[0], output[2])
+
+    def test_encode_states_with_empty_fleets(self):
+        state = State(
+            hyperlanes={
+                key: lane._replace(fleets=[])
+                for key, lane in self.hyperlanes.items()
+            },
+            planets=self.planets,
+        )
+        batch = [state, state, state]
+        inputs = create_state_inputs(batch_size=len(batch))
+
+        graphs_tuple_tf = state_inputs2graphs_tuple(inputs)
+
+        model = tf.keras.Model(
+            inputs=inputs,
+            outputs=graphs_tuple_tf.edges)
+        output = model.predict_on_batch(
+            feed_dict(batch))
+
+        self.assertEqual(
+            output.shape,
+            (len(batch) * len(state.hyperlanes), HYPERLANE_EMBEDDING_SIZE))
+        self.assertFalse(np.any(np.isnan(output)), output)

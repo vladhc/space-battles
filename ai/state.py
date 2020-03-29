@@ -117,7 +117,13 @@ def state_inputs2graphs_tuple(
         ])
         lanes = mask_zeros(lanes)
         lanes = lane_embedder(lanes)
-        lanes = tf.keras.backend.mean(lanes, axis=1)
+        # We have explicitly specify tensor shape, because
+        # TimeDistributed will output wrong dimensions when
+        # there are 0 elements in a sequence.
+        lanes = tf.reshape(
+            lanes,
+            shape=(lanes_count, -1, HYPERLANE_EMBEDDING_SIZE))
+        lanes = _safe_mean(lanes, axis=1)
         lanes = tf.reshape(
             lanes,
             shape=(lanes_count, HYPERLANE_EMBEDDING_SIZE),
@@ -210,3 +216,18 @@ def _create_state_input(suffix: str) -> Mapping[str, Input]:
             name='{}_{}'.format(HYPERLANE_FLEET_COUNT, suffix),
             dtype=tf.dtypes.int32),
     }
+
+
+def _safe_mean(tensor, axis: int):
+    """
+    Standard keras and tf implementation return nans
+    when there are 0 elements.
+    """
+    return tf.keras.layers.Lambda(
+        lambda arg: tf.math.divide_no_nan(
+            tf.cast(
+                tf.math.reduce_sum(arg, axis=axis),
+                dtype=tf.dtypes.float32),
+            tf.cast(
+                tf.shape(arg)[axis],
+                dtype=tf.dtypes.float32)))(tensor)
