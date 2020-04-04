@@ -93,10 +93,7 @@ def create_model(batch_size: int) -> tf.keras.Model:
     model = tf.keras.Model(
         inputs=model_inputs,
         outputs=is_correct_action_head)
-    model_debug = tf.keras.Model(
-        inputs=model_inputs,
-        outputs=states)
-    return (model, model_debug)
+    return model
 
 
 def _create_incorrect_lane(
@@ -182,53 +179,76 @@ def create_dataset(batch_size):
         yield features, labels
 
 
-def train(models: Tuple[tf.keras.Model], dataset, steps: int):
-    # Prepare dataset
-    last_acc: Deque[Any] = deque([], 3200)
-    last_loss: Deque[Any] = deque([], 3200)
+def train(
+        model: tf.keras.Model,
+        dataset,
+        steps_per_epoch: int,
+        callbacks: List[tf.keras.callbacks.Callback]):
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
     metric = tf.keras.metrics.BinaryAccuracy()
     loss_fn = tf.keras.losses.BinaryCrossentropy()
 
-    model = models[0]
-    model_debug = models[1]
     debug = False
+    for callback in callbacks:
+        callback.set_model(model)
+        callback.on_train_begin()
 
-    for step in range(0, steps):
-        features, labels = next(dataset)
-        if debug:
-            print("--- step {} ---".format(step))
-            print("features:", features["planets_0"], features["action"])
-            print("labels:", labels)
-            out_debug = model_debug(features)[0][PLANETS]
-            print("out_debug:", out_debug)
+    epoch = 0
+    while True:
+        for callback in callbacks:
+            callback.on_epoch_begin(epoch)
+        last_acc: List[float] = []
+        last_loss: List[float] = []
 
-        # Train step
-        with tf.GradientTape() as tape:
-            out = model(features)
-            loss = loss_fn(labels, out)
+        for step in range(0, steps_per_epoch):
+            features, labels = next(dataset)
+            for callback in callbacks:
+                callback.on_train_batch_begin(
+                    step,
+                    logs={"batch": step, "size": len(labels)})
 
-        gradients = tape.gradient(loss, model.trainable_variables)
-        optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-        metric.reset_states()
-        metric.update_state(labels, out)
+            # Train step
+            with tf.GradientTape() as tape:
+                out = model(features)
+                loss = loss_fn(labels, out)
 
-        last_loss.append(loss.numpy())
-        last_acc.append(metric.result().numpy())
+            gradients = tape.gradient(loss, model.trainable_variables)
+            optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+            metric.reset_states()
+            metric.update_state(labels, out)
 
-        print('step {}: {:.2f} {:.2f} ({:.2f}, {:.2f})'.format(
-            step,
-            loss.numpy(), metric.result().numpy(),
-            sum(last_loss)/len(last_loss),
-            sum(last_acc)/len(last_acc)))
+            last_loss.append(loss.numpy())
+            last_acc.append(metric.result().numpy())
+
+            for callback in callbacks:
+                callback.on_train_batch_end(
+                        step,
+                        logs={
+                            "loss": loss.numpy(),
+                            "accuracy": metric.result().numpy()})
+
+        for callback in callbacks:
+            callback.on_epoch_end(
+                epoch,
+                logs={
+                    "loss": sum(last_loss)/len(last_loss),
+                    "accuracy": sum(last_acc)/len(last_acc)})
+        epoch += 1
+
+    for callback in callbacks:
+        callback.on_train_end()
 
 
 def main():
     batch_size = 16
     dataset = create_dataset(batch_size)
-    models = create_model(batch_size)
-    train(models, dataset, 1000000)
+    model = create_model(batch_size)
+    callbacks = [
+        tf.keras.callbacks.TensorBoard(
+            "logs", write_graph=False, profile_batch=0),
+    ]
+    train(model, dataset, 10, callbacks)
 
 
 if __name__ == '__main__':
