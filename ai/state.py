@@ -3,7 +3,8 @@ from typing import Mapping, List, Dict
 
 import graph_nets as gn
 import tensorflow as tf
-from tensorflow.keras import Input
+from tensorflow.keras import Input  # pylint: disable=import-error
+
 import numpy as np
 
 from models import State, Planet
@@ -31,17 +32,14 @@ HYPERLANE_COUNT = "hyperlanes_count"
 
 
 def feed_dict(
-        states: List[State]) -> List[Dict[str, np.array]]:
+        states: List[State]) -> Dict[str, np.array]:
     """
     Creates mapping from models to batch of game states.
     """
 
-    arr = []
+    mapping: Dict[str, np.array] = {}
 
     for idx, state in enumerate(states):
-        mapping: Dict[str, np.array] = {}
-        arr.append(mapping)
-
         mapping['{}_{}'.format(PLANETS_COUNT, idx)] = np.asarray([
             len(state.planets)], dtype=np.int32)
         mapping['{}_{}'.format(HYPERLANE_COUNT, idx)] = np.asarray([
@@ -83,7 +81,7 @@ def feed_dict(
         mapping['{}_{}'.format(FLEETS_COUNT, idx)] = np.asarray([
             len(fleets)])
 
-    return arr
+    return mapping
 
 
 def state_inputs2graphs_tuple(
@@ -130,11 +128,13 @@ def state_inputs2graphs_tuple(
             name='reshape_lanes')
 
         # Nodes
+        planets = state[PLANETS]
         planets_count = state[PLANETS_COUNT]
         planets_count = tf.reshape(planets_count, ())
+        planets_feature_count = planets.shape[1]
         planets = tf.reshape(
-            state[PLANETS],
-            shape=(planets_count, PLANET_FEATURE_COUNT))
+            planets,
+            shape=(planets_count, planets_feature_count))
 
         data_dicts.append({
             GLOBALS: tf.zeros(shape=(1,)),

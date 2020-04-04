@@ -61,7 +61,7 @@ class TestState(unittest.TestCase):
             hyperlanes=hyperlanes,
             planets=self.planets)
 
-        mapped = feed_dict([state])[0]
+        mapped = feed_dict([state])
 
         self.assertEqual(mapped['fleets_0'].shape, (0, FLEET_FEATURE_COUNT))
 
@@ -177,7 +177,7 @@ class TestState(unittest.TestCase):
         model = tf.keras.Model(inputs=inputs, outputs=encoded)
 
         output = model.predict_on_batch(
-            feed_dict(batch))
+            feed_dict(batch)).numpy()
 
         self.assertEqual(
             output.shape,
