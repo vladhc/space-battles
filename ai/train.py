@@ -266,4 +266,10 @@ def main():
 
 
 if __name__ == '__main__':
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    print("Num GPUs Available: ", len(gpus))
+    for gpu in gpus:
+        print(gpu)
+    assert gpus
+    tf.debugging.set_log_device_placement(True)
     main()
