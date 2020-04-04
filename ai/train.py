@@ -1,5 +1,6 @@
 # pylint: disable=missing-docstring
 import json
+from time import time
 import random
 from typing import List, Deque, Any, Generator, Mapping, Set, Tuple
 from collections import deque
@@ -200,15 +201,22 @@ def train(
             callback.on_epoch_begin(epoch)
         last_acc: List[float] = []
         last_loss: List[float] = []
+        train_time = []
+        sample_time = []
+        step_time = []
 
         for step in range(0, steps_per_epoch):
+            step_time0 = time()
+            t0 = time()
             features, labels = next(dataset)
+            sample_time.append(time() - t0)
             for callback in callbacks:
                 callback.on_train_batch_begin(
                     step,
                     logs={"batch": step, "size": len(labels)})
 
             # Train step
+            t0 = time()
             with tf.GradientTape() as tape:
                 out = model(features)
                 loss = loss_fn(labels, out)
@@ -217,6 +225,7 @@ def train(
             optimizer.apply_gradients(zip(gradients, model.trainable_variables))
             metric.reset_states()
             metric.update_state(labels, out)
+            train_time.append(time() - t0)
 
             last_loss.append(loss.numpy())
             last_acc.append(metric.result().numpy())
@@ -227,13 +236,18 @@ def train(
                         logs={
                             "loss": loss.numpy(),
                             "accuracy": metric.result().numpy()})
+            step_time.append(time() - step_time0)
 
         for callback in callbacks:
             callback.on_epoch_end(
                 epoch,
                 logs={
                     "loss": sum(last_loss)/len(last_loss),
-                    "accuracy": sum(last_acc)/len(last_acc)})
+                    "accuracy": sum(last_acc)/len(last_acc),
+                    "steps_per_second": len(step_time) / sum(step_time),
+                    "batches_per_second": len(sample_time) / sum(sample_time),
+                    "train_steps_per_second": len(train_time) / sum(train_time),
+                })
         epoch += 1
 
     for callback in callbacks:
