@@ -3,14 +3,12 @@
 import unittest
 
 import numpy as np
-import graph_nets as gn
-import sonnet as snt
-import tensorflow as tf
 
-from state import create_state_inputs, feed_dict
-from state import state_inputs2graphs_tuple
-from state import FLEET_FEATURE_COUNT
-from state import HYPERLANE_EMBEDDING_SIZE
+from state import feed_dict
+from state import FLEET_FEATURE_COUNT, FLEETS, FLEETS_COUNT
+from state import PLANETS, PLANETS_COUNT
+from state import HYPERLANE_SOURCES, HYPERLANE_TARGETS, HYPERLANE_COUNT
+from state import HYPERLANE_FLEET_COUNT
 from models import State, Hyperlane, Planet, Fleet
 
 
@@ -61,11 +59,11 @@ class TestState(unittest.TestCase):
             hyperlanes=hyperlanes,
             planets=self.planets)
 
-        mapped = feed_dict([state])
+        mapped = feed_dict(state)
 
-        self.assertEqual(mapped['fleets_0'].shape, (0, FLEET_FEATURE_COUNT))
+        self.assertEqual(mapped[FLEETS].shape, (0, FLEET_FEATURE_COUNT))
 
-    def test_state_inputs(self):
+    def test_feed_dict(self):
         planets = self.planets
         planets_encoded = np.asarray([
             [
@@ -110,34 +108,27 @@ class TestState(unittest.TestCase):
             hyperlanes=hyperlanes,
             planets=planets)
 
-        inputs = create_state_inputs(batch_size=1)
-        model = tf.keras.Model(inputs=inputs, outputs=inputs)
-
-        output = model.predict_on_batch(
-            feed_dict([state]))
-
-        self.assertEqual(len(output), 1)
-        record = output[0]
+        record = feed_dict(state)
         np.testing.assert_equal(
-            record['planets_count'],
+            record[PLANETS_COUNT],
             np.asarray([len(planets)]))
         np.testing.assert_equal(
-            record['hyperlanes_count'],
+            record[HYPERLANE_COUNT],
             np.asarray([len(state.hyperlanes)]))
         np.testing.assert_equal(
-            record['fleets_count'],
+            record[FLEETS_COUNT],
             np.asarray([len(fleets)]))
         np.testing.assert_almost_equal(
-            record['planets'],
+            record[PLANETS],
             planets_encoded)
         np.testing.assert_almost_equal(
-            record['fleets'],
+            record[FLEETS],
             fleets_encoded)
 
         # Hyperlanes order is not defined
-        src = record['hyperlane_sources']
-        tgt = record['hyperlane_targets']
-        fleet_count = record['hyperlane_fleet_count']
+        src = record[HYPERLANE_SOURCES]
+        tgt = record[HYPERLANE_TARGETS]
+        fleet_count = record[HYPERLANE_FLEET_COUNT]
         lanes_match = np.array_equal(
             src, [0, 1]) and np.array_equal(
                 tgt, [1, 0] and np.array_equal(
@@ -152,59 +143,3 @@ class TestState(unittest.TestCase):
                 "hyperlane_targets and " +
                 "hyperlane_fleet_count:\n{} {} {}".format(
                     src, tgt, fleet_count))
-
-    def test_encode_states(self):
-        state = State(
-            hyperlanes=self.hyperlanes,
-            planets=self.planets)
-        batch = [state, state, state]
-        inputs = create_state_inputs(batch_size=len(batch))
-
-        graphs_tuple_tf = state_inputs2graphs_tuple(inputs)
-
-        units = [32, 16, 8]
-        graph_network = gn.modules.GraphNetwork(
-            edge_model_fn=lambda: snt.nets.MLP(
-                units, activate_final=True),
-            node_model_fn=lambda: snt.nets.MLP(
-                units, activate_final=True),
-            global_model_fn=lambda: snt.nets.MLP(
-                units, activate_final=False),
-            name='game_state_encoder')
-        out_graph = graph_network(graphs_tuple_tf)
-        encoded = out_graph.globals
-
-        model = tf.keras.Model(inputs=inputs, outputs=encoded)
-
-        output = model.predict_on_batch(
-            feed_dict(batch)).numpy()
-
-        self.assertEqual(
-            output.shape,
-            (len(batch), units[-1]))
-        np.testing.assert_almost_equal(output[0], output[1])
-        np.testing.assert_almost_equal(output[0], output[2])
-
-    def test_encode_states_with_empty_fleets(self):
-        state = State(
-            hyperlanes={
-                key: lane._replace(fleets=[])
-                for key, lane in self.hyperlanes.items()
-            },
-            planets=self.planets,
-        )
-        batch = [state, state, state]
-        inputs = create_state_inputs(batch_size=len(batch))
-
-        graphs_tuple_tf = state_inputs2graphs_tuple(inputs)
-
-        model = tf.keras.Model(
-            inputs=inputs,
-            outputs=graphs_tuple_tf.edges)
-        output = model.predict_on_batch(
-            feed_dict(batch))
-
-        self.assertEqual(
-            output.shape,
-            (len(batch) * len(state.hyperlanes), HYPERLANE_EMBEDDING_SIZE))
-        self.assertFalse(np.any(np.isnan(output)), output)
