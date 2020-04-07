@@ -10,11 +10,13 @@ class StateEncoder(snt.Module):
     def __init__(self):
         super().__init__(name="state_encoder")
         self.graph_network = gn.modules.GraphNetwork(
-            edge_model_fn=lambda: snt.Linear(8),
-            node_model_fn=lambda: snt.nets.MLP([32, 16]),
+            edge_model_fn=lambda: snt.nets.MLP(
+                [32, 32, 16], activate_final=False),
+            node_model_fn=lambda: snt.nets.MLP(
+                [32, 32, 16], activate_final=False),
             node_block_opt={"use_sent_edges": True},
             global_model_fn=lambda: snt.nets.MLP(
-                [32, 16, 4], activate_final=False))
+                [32, 16, 16, 4], activate_final=False))
 
     def __call__(self, graphs_data_dict, actions):
         graphs = gn.graphs.GraphsTuple(**graphs_data_dict)

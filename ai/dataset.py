@@ -12,6 +12,7 @@ from adapters import json2state
 from state import feed_dict
 
 from state import PLANETS
+from state import FLEETS
 from state import HYPERLANE_TARGETS
 from state import HYPERLANE_SOURCES
 
@@ -50,7 +51,7 @@ def states_to_graphs(states: List[State]) -> gn.graphs.GraphsTuple:
         data_dicts.append({
             GLOBALS: np.zeros((0,), dtype=np.float32),
             NODES: props[PLANETS],
-            EDGES: tf.zeros((len(state.hyperlanes), 0), dtype=np.float32),
+            EDGES: props[FLEETS],
             SENDERS: props[HYPERLANE_SOURCES],
             RECEIVERS: props[HYPERLANE_TARGETS],
         })

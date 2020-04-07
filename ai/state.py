@@ -17,7 +17,6 @@ PLANETS_COUNT = "planets_count"
 HYPERLANE_TARGETS = "hyperlane_targets"
 HYPERLANE_SOURCES = "hyperlane_sources"
 HYPERLANE_FLEET_COUNT = "hyperlane_fleet_count"  # fleets count per hyperlane
-HYPERLANE_COUNT = "hyperlanes_count"
 
 
 def feed_dict(
@@ -30,42 +29,32 @@ def feed_dict(
 
     mapping[PLANETS_COUNT] = np.asarray([
         len(state.planets)], dtype=np.int32)
-    mapping[HYPERLANE_COUNT] = np.asarray([
-        len(state.hyperlanes)], dtype=np.int32)
 
     mapping[PLANETS] = _encode_planets(state.planets)
 
-    fleets = []
-    sources = np.zeros(
-        shape=(len(state.hyperlanes)),
-        dtype=np.int32)
-    targets = np.zeros_like(sources)
-    hyperlane_fleet_count = np.zeros_like(sources, dtype=np.int32)
-    hyperlane_idx = 0
+    edges: List[np.array] = []
+    sources: List[int] = []
+    targets: List[int] = []
     for from_to, hyperlane in state.hyperlanes.items():
-        sources[hyperlane_idx] = from_to[0]
-        targets[hyperlane_idx] = from_to[1]
-        hyperlane_fleet_count[hyperlane_idx] = len(hyperlane.fleets)
+        # Edge which means "hyperlane"
+        sources.append(from_to[0])
+        targets.append(from_to[1])
+        edges.append(np.zeros(FLEET_FEATURE_COUNT, dtype=np.float32))
+        # Adding one edge per each fleet
         for fleet in hyperlane.fleets:
-            fleets.append([
-                fleet.owner,
+            sources.append(from_to[0])
+            targets.append(from_to[1])
+            edges.append([
+                fleet.owner - 1,  # fleet.owner is either 1 or 2
                 fleet.eta,
                 fleet.ships[0],
                 fleet.ships[1],
                 fleet.ships[2],
             ])
-        hyperlane_idx += 1
 
-    mapping[HYPERLANE_SOURCES] = sources
-    mapping[HYPERLANE_TARGETS] = targets
-    mapping[HYPERLANE_FLEET_COUNT] = hyperlane_fleet_count
-
-    if fleets:
-        fleets = np.asarray(fleets, dtype=np.float32)
-    else:
-        fleets = np.zeros(shape=(0, FLEET_FEATURE_COUNT), dtype=np.float32)
-    mapping[FLEETS] = fleets
-    mapping[FLEETS_COUNT] = np.asarray([len(fleets)], dtype=np.int32)
+    mapping[HYPERLANE_SOURCES] = np.asarray(sources, dtype=np.int32)
+    mapping[HYPERLANE_TARGETS] = np.asarray(targets, dtype=np.int32)
+    mapping[FLEETS] = np.asarray(edges, dtype=np.float32)
 
     return mapping
 
