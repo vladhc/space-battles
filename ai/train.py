@@ -51,7 +51,7 @@ def _fleet_labels(state: State) -> Tuple[int, int, int]:
                 ships[0] += fleet.ships[0]
                 ships[1] += fleet.ships[1]
                 ships[2] += fleet.ships[2]
-    return ships
+    return (ships[0], ships[1], ships[2])
 
 
 def create_dataset_generator(batch_size):
@@ -158,7 +158,7 @@ def train(
         measures = Measures()
         metric_actions.reset_states()
 
-        for step in range(0, steps_per_epoch):
+        for _ in range(0, steps_per_epoch):
             measures.start_timer(Measures.STEP_TIME)
             measures.start_timer(Measures.SAMPLE_TIME)
             record = next(dataset_iter)

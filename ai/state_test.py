@@ -5,10 +5,9 @@ import unittest
 import numpy as np
 
 from state import feed_dict
-from state import FLEET_FEATURE_COUNT, FLEETS, FLEETS_COUNT
+from state import FLEET_FEATURE_COUNT, FLEETS
 from state import PLANETS, PLANETS_COUNT
-from state import HYPERLANE_SOURCES, HYPERLANE_TARGETS, HYPERLANE_COUNT
-from state import HYPERLANE_FLEET_COUNT
+from state import HYPERLANE_SOURCES, HYPERLANE_TARGETS
 from models import State, Hyperlane, Planet, Fleet
 
 
@@ -61,38 +60,46 @@ class TestState(unittest.TestCase):
 
         mapped = feed_dict(state)
 
-        self.assertEqual(mapped[FLEETS].shape, (0, FLEET_FEATURE_COUNT))
+        # every hyperlane counts as an empty fleet
+        self.assertEqual(
+            mapped[FLEETS].shape,
+            (len(hyperlanes), FLEET_FEATURE_COUNT))
 
+    # pylint: disable=too-many-locals
     def test_feed_dict(self):
         planets = self.planets
-        planets_encoded = np.asarray([
-            [
-                planets[0].owner,
-                planets[0].x,
-                planets[0].y,
-                planets[0].ships[0],
-                planets[0].ships[1],
-                planets[0].ships[2],
-                planets[0].production[0],
-                planets[0].production[1],
-                planets[0].production[2],
-                planets[0].production_rounds_left,
-            ], [
-                planets[1].owner,
-                planets[1].x,
-                planets[1].y,
-                planets[1].ships[0],
-                planets[1].ships[1],
-                planets[1].ships[2],
-                planets[1].production[0],
-                planets[1].production[1],
-                planets[1].production[2],
-                planets[1].production_rounds_left,
-            ],
-        ], dtype=np.float32)
 
         fleets = self.fleets
-        fleets_encoded = np.asarray([
+        fleets_encoded_permutation_1 = np.asarray([
+            # Hyperlane (1, 0)
+            [0, 0, 0, 0, 0],
+            # Hyperlane (1, 0), fleet #0
+            [
+                fleets[0].owner - 1,
+                fleets[0].eta,
+                fleets[0].ships[0],
+                fleets[0].ships[1],
+                fleets[0].ships[2],
+            ],
+            # Hyperlane (0, 1)
+            [0, 0, 0, 0, 0],
+        ], dtype=np.int32)
+        sources_encoded_permutation_1 = np.asarray([
+            1,  # Hyperlane 1
+            1,  # Hyperlane 1, fleet #0
+            0,  # Hyperlane 2
+        ])
+        targets_encoded_permutation_1 = np.asarray([
+            0,  # Hyperlane 1
+            0,  # Hyperlane 1, fleet #0
+            1,  # Hyperlane 2
+        ])
+
+        fleets_encoded_permutation_2 = np.asarray([
+            # Hyperlane 2
+            [0, 0, 0, 0, 0],
+            # Hyperlane 1
+            [0, 0, 0, 0, 0],
             [
                 fleets[0].owner,
                 fleets[0].eta,
@@ -101,6 +108,16 @@ class TestState(unittest.TestCase):
                 fleets[0].ships[2],
             ]
         ], dtype=np.int32)
+        sources_encoded_permutation_2 = np.asarray([
+            0,  # Hyperlane 2
+            1,  # Hyperlane 1
+            1,  # Hyperlane 1, fleet #0
+        ])
+        targets_encoded_permutation_2 = np.asarray([
+            1,  # Hyperlane 1
+            1,  # Hyperlane 1, fleet #0
+            0,  # Hyperlane 2
+        ])
 
         hyperlanes = self.hyperlanes
 
@@ -112,34 +129,58 @@ class TestState(unittest.TestCase):
         np.testing.assert_equal(
             record[PLANETS_COUNT],
             np.asarray([len(planets)]))
-        np.testing.assert_equal(
-            record[HYPERLANE_COUNT],
-            np.asarray([len(state.hyperlanes)]))
-        np.testing.assert_equal(
-            record[FLEETS_COUNT],
-            np.asarray([len(fleets)]))
         np.testing.assert_almost_equal(
             record[PLANETS],
-            planets_encoded)
-        np.testing.assert_almost_equal(
-            record[FLEETS],
-            fleets_encoded)
+            np.asarray([
+                [
+                    planets[0].owner,
+                    planets[0].x,
+                    planets[0].y,
+                    planets[0].ships[0],
+                    planets[0].ships[1],
+                    planets[0].ships[2],
+                    planets[0].production[0],
+                    planets[0].production[1],
+                    planets[0].production[2],
+                    planets[0].production_rounds_left,
+                ], [
+                    planets[1].owner,
+                    planets[1].x,
+                    planets[1].y,
+                    planets[1].ships[0],
+                    planets[1].ships[1],
+                    planets[1].ships[2],
+                    planets[1].production[0],
+                    planets[1].production[1],
+                    planets[1].production[2],
+                    planets[1].production_rounds_left,
+                ],
+            ], dtype=np.float32))
 
         # Hyperlanes order is not defined
+        edges = record[FLEETS]
         src = record[HYPERLANE_SOURCES]
         tgt = record[HYPERLANE_TARGETS]
-        fleet_count = record[HYPERLANE_FLEET_COUNT]
-        lanes_match = np.array_equal(
-            src, [0, 1]) and np.array_equal(
-                tgt, [1, 0] and np.array_equal(
-                    fleet_count, [0, 1]))
-        lanes_match = lanes_match or (np.array_equal(
-            src, [1, 0]) and np.array_equal(
-                tgt, [0, 1]) and np.array_equal(
-                    fleet_count, [1, 0]))
-        if not lanes_match:
+
+        match = False
+        for exp_src, exp_tgt, exp_edges in [
+                (
+                    sources_encoded_permutation_1,
+                    targets_encoded_permutation_1,
+                    fleets_encoded_permutation_1,
+                ),
+                (
+                    sources_encoded_permutation_2,
+                    targets_encoded_permutation_2,
+                    fleets_encoded_permutation_2,
+                )]:
+            match = np.array_equal(exp_src, src) and \
+                    np.array_equal(exp_tgt, tgt) and \
+                    np.array_equal(exp_edges, edges)
+            if match:
+                break
+
+        if not match:
             self.fail(
-                "unexpected hyperlane_sources, " +
-                "hyperlane_targets and " +
-                "hyperlane_fleet_count:\n{} {} {}".format(
-                    src, tgt, fleet_count))
+                "unexpected edges, edge sources or " +
+                "edge targets:\n{}\n{}\n{}".format(edges, src, tgt))

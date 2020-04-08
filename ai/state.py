@@ -1,5 +1,5 @@
 """Utilities for encoding/decoding game state"""
-from typing import Mapping, Dict
+from typing import Mapping, Dict, List
 
 import numpy as np
 
@@ -11,12 +11,10 @@ PLANET_FEATURE_COUNT = 10
 FLEET_FEATURE_COUNT = 5  # Without origin and target
 
 FLEETS = "fleets"
-FLEETS_COUNT = "fleets_count"
 PLANETS = "planets"
 PLANETS_COUNT = "planets_count"
 HYPERLANE_TARGETS = "hyperlane_targets"
 HYPERLANE_SOURCES = "hyperlane_sources"
-HYPERLANE_FLEET_COUNT = "hyperlane_fleet_count"  # fleets count per hyperlane
 
 
 def feed_dict(

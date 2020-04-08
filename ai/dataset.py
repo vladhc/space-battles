@@ -5,7 +5,6 @@ from typing import List, Any, Generator, Mapping
 import numpy as np
 import graph_nets as gn
 from graph_nets.graphs import NODES, EDGES, RECEIVERS, SENDERS, GLOBALS
-import tensorflow as tf
 
 from models import State
 from adapters import json2state
