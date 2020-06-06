@@ -7,7 +7,11 @@ import ray
 
 from game_client import RPSClient
 
+from state import feed_dict
+
 MAX_PLANETS = 21
+
+NOOP = 'noop'
 
 class SpaceEnv(gym.Env):
     action_space = Tuple([
@@ -16,7 +20,8 @@ class SpaceEnv(gym.Env):
         Box(low=0, high=1, shape=(3,), dtype=np.float32),  # ships(x3)
     ])
 
-    def __init__(self, **kwargs):
+    def __init__(self, client_args):
+        self._client_args = client_args
         self._client = None
         self._last_game_state = None
         self._last_planets_count = 1
@@ -24,7 +29,7 @@ class SpaceEnv(gym.Env):
     def _lazy_init(self):
         if self._client:
             return
-        self._client = RPSClient(**kwargs)
+        self._client = RPSClient(**self._client_args)
 
     def reset(self):
         self._lazy_init()
@@ -67,28 +72,28 @@ def count_planets(game_state) -> int:
     return len(planets)
 
 
-def to_game_action(planets, rl_action):
+def to_game_action(planets, action):
     planets = {planet["id"]: planet for planet in planets}
 
     source, target = action[0], action[1]
-    if source not in planet_ids or target not in planet_ids or source == target:
+    if source not in planets or target not in planets or source == target:
         return NOOP
 
-    source = planet_ids[source]
-    target = planet_ids[target]
+    source = planets[source]
+    target = planets[target]
 
     ships = source["ships"]
     ship_ratios = action[2]
 
-    num_a = int(round(ships_ratio[0] * ships[0]))
-    num_b = int(round(ships_ratio[1] * ships[1]))
-    num_c = int(round(ships_ratio[2] * ships[2]))
+    num_a = int(round(ship_ratios[0] * ships[0]))
+    num_b = int(round(ship_ratios[1] * ships[1]))
+    num_c = int(round(ship_ratios[2] * ships[2]))
 
     if num_a == 0 and num_b == 0 and num_c == 0:
         return NOOP
     if num_a < 0 or num_b < 0 or num_c < 0:
-        print("ship ratios and ships:", ships_ratio, ships)
+        print("ship ratios and ships:", ship_ratios, ships)
     return f'send {source["id"]} {target["id"]} {num_a} {num_b} {num_c}'
 
 def parse_game_state(game_state):
-    pass
+    return feed_dict(game_state)
